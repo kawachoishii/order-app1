@@ -35,6 +35,8 @@
   .prod-name{font-size:13px;font-weight:500;line-height:1.4;}
   .prod-code{font-size:10px;color:var(--muted);font-family:'DM Mono',monospace;}
   .qty{width:64px;padding:7px 6px;font-size:15px;text-align:center;border-radius:7px;border:1.5px solid var(--border);font-family:'DM Mono',monospace;background:white;flex-shrink:0;}
+  .unit-sel{padding:7px 4px;font-size:13px;border-radius:7px;border:1.5px solid var(--border);font-family:'Noto Sans JP',sans-serif;background:white;flex-shrink:0;outline:none;cursor:pointer;max-width:72px;}
+  .prod-item.selected .unit-sel{border-color:var(--primary2);}
   .prod-item.selected .qty{border-color:var(--primary2);}
   .placeholder{text-align:center;padding:36px 16px;color:var(--muted);}
   .placeholder .ico{font-size:38px;margin-bottom:10px;}
@@ -122,6 +124,23 @@
     .ob-memo{ padding:7px 12px; background:#fffbf0; border-top:1px dashed #ccc; font-size:10pt; color:#555; }
     .print-footer{ margin-top:14px; font-size:8pt; color:#aaa; text-align:right; }
   }
+  .free-item-row{display:flex;gap:6px;align-items:center;margin-bottom:7px;padding:10px 12px;border:1.5px dashed var(--border);border-radius:9px;background:#fffefb;}
+  .free-item-name{flex:1;padding:8px 10px;border:1.5px solid var(--border);border-radius:7px;font-family:'Noto Sans JP',sans-serif;font-size:14px;outline:none;}
+  .free-item-name:focus{border-color:var(--primary);}
+  .free-item-qty{width:60px;padding:8px 6px;text-align:center;border:1.5px solid var(--border);border-radius:7px;font-size:14px;font-family:'DM Mono',monospace;outline:none;}
+  .free-item-unit{padding:8px 4px;font-size:13px;border-radius:7px;border:1.5px solid var(--border);font-family:'Noto Sans JP',sans-serif;background:white;outline:none;max-width:70px;}
+  .free-item-del{width:28px;height:28px;background:none;border:none;font-size:18px;color:#aaa;cursor:pointer;flex-shrink:0;padding:0;}
+  .cust-search-wrap{position:relative;}
+  .cust-search-input{width:100%;padding:12px 14px 12px 36px;border:1.5px solid var(--border);border-radius:9px;font-family:'Noto Sans JP',sans-serif;font-size:15px;outline:none;background:white;box-sizing:border-box;cursor:pointer;}
+  .cust-search-input:focus{border-color:var(--primary);}
+  .cust-search-icon{position:absolute;left:12px;top:50%;transform:translateY(-50%);font-size:14px;pointer-events:none;}
+  .cust-dropdown{position:absolute;top:calc(100% + 4px);left:0;right:0;background:white;border:1.5px solid var(--primary);border-radius:9px;box-shadow:0 4px 16px rgba(0,0,0,0.12);z-index:100;max-height:260px;overflow-y:auto;display:none;}
+  .cust-dropdown.open{display:block;}
+  .cust-opt{padding:11px 14px;font-family:'Noto Sans JP',sans-serif;font-size:14px;cursor:pointer;border-bottom:1px solid #f0f0ee;}
+  .cust-opt:last-child{border-bottom:none;}
+  .cust-opt:hover,.cust-opt.active{background:var(--primary-light);}
+  .cust-opt.new-opt{color:var(--primary2);font-weight:700;}
+  .cust-opt mark{background:#fff3b0;color:inherit;font-weight:700;border-radius:2px;}
   #print-area{ display:none; }
 </style>
 </head>
@@ -146,10 +165,18 @@
   </div>
   <div class="card">
     <div class="card-label">顧客</div>
-    <div class="sel-wrap">
-      <select id="sel-customer" onchange="loadProducts()">
-        <option value="">顧客を選択してください</option>
-      </select>
+    <div class="cust-search-wrap" id="cust-search-wrap">
+      <span class="cust-search-icon">🔍</span>
+      <input type="text" id="cust-search-input" class="cust-search-input" placeholder="顧客名で検索または選択…"
+        oninput="filterCustomers()" onfocus="openCustDropdown()" autocomplete="off" readonly>
+      <input type="hidden" id="sel-customer" value="">
+      <div class="cust-dropdown" id="cust-dropdown"></div>
+    </div>
+    <div id="new-cust-wrap" style="display:none;margin-top:8px;">
+      <input type="text" id="new-cust-name" placeholder="顧客名を入力してください"
+        style="width:100%;padding:12px 14px;border:1.5px solid var(--border);border-radius:9px;font-family:'Noto Sans JP',sans-serif;font-size:15px;outline:none;background:white;"
+        onfocus="this.style.borderColor='var(--primary)'" onblur="this.style.borderColor='var(--border)'"
+        oninput="checkReady()">
     </div>
   </div>
   <div class="card">
@@ -157,8 +184,18 @@
       <div class="card-label" style="margin-bottom:0">注文商品</div>
       <div class="prod-count" id="prod-count">0件選択</div>
     </div>
+    <div id="prod-search-wrap" style="display:none;margin-bottom:10px;position:relative;">
+      <span style="position:absolute;left:12px;top:50%;transform:translateY(-50%);font-size:14px;pointer-events:none;">🔍</span>
+      <input type="text" id="prod-search" placeholder="商品名で絞り込み…" oninput="filterProducts()"
+        style="width:100%;padding:10px 14px 10px 36px;border:1.5px solid var(--border);border-radius:9px;font-family:'Noto Sans JP',sans-serif;font-size:14px;outline:none;background:white;"
+        onfocus="this.style.borderColor='var(--primary)'" onblur="this.style.borderColor='var(--border)'">
+    </div>
     <div id="prod-list">
       <div class="placeholder"><div class="ico">🏪</div><p>顧客を選ぶと<br>定番商品が表示されます</p></div>
+    </div>
+    <div id="free-items-wrap" style="display:none;">
+      <div id="free-items-list"></div>
+      <button onclick="addFreeItem()" style="width:100%;margin-top:6px;padding:10px;background:white;border:1.5px dashed var(--border);border-radius:9px;font-family:'Noto Sans JP',sans-serif;font-size:13px;color:var(--primary2);cursor:pointer;font-weight:700;">＋ 商品を手入力</button>
     </div>
   </div>
   <div class="card">
@@ -210,11 +247,84 @@ const CUSTOMER_DATA = {"10001": {"name": "その他 個人 (日田市内)", "pro
 const GAS_URL = "https://script.google.com/macros/s/AKfycbytKVPkLTdZwGzvc5cUZIEPKcV-r2z3YMiV33jYiFIMU-ivJUbOdasM6ZiYFvH32E0p/exec";
 const custSel = document.getElementById('sel-customer');
 
-Object.keys(CUSTOMER_DATA)
+// ===== 顧客検索UI =====
+function toHalfKanaC(str){
+  const m={'ア':'ｱ','イ':'ｲ','ウ':'ｳ','エ':'ｴ','オ':'ｵ','カ':'ｶ','キ':'ｷ','ク':'ｸ','ケ':'ｹ','コ':'ｺ','サ':'ｻ','シ':'ｼ','ス':'ｽ','セ':'ｾ','ソ':'ｿ','タ':'ﾀ','チ':'ﾁ','ツ':'ﾂ','テ':'ﾃ','ト':'ﾄ','ナ':'ﾅ','ニ':'ﾆ','ヌ':'ﾇ','ネ':'ﾈ','ノ':'ﾉ','ハ':'ﾊ','ヒ':'ﾋ','フ':'ﾌ','ヘ':'ﾍ','ホ':'ﾎ','マ':'ﾏ','ミ':'ﾐ','ム':'ﾑ','メ':'ﾒ','モ':'ﾓ','ヤ':'ﾔ','ユ':'ﾕ','ヨ':'ﾖ','ラ':'ﾗ','リ':'ﾘ','ル':'ﾙ','レ':'ﾚ','ロ':'ﾛ','ワ':'ﾜ','ヲ':'ｦ','ン':'ﾝ','ァ':'ｧ','ィ':'ｨ','ゥ':'ｩ','ェ':'ｪ','ォ':'ｫ','ッ':'ｯ','ャ':'ｬ','ュ':'ｭ','ョ':'ｮ','ガ':'ｶﾞ','ギ':'ｷﾞ','グ':'ｸﾞ','ゲ':'ｹﾞ','ゴ':'ｺﾞ','ザ':'ｻﾞ','ジ':'ｼﾞ','ズ':'ｽﾞ','ゼ':'ｾﾞ','ゾ':'ｿﾞ','ダ':'ﾀﾞ','ヂ':'ﾁﾞ','ヅ':'ﾂﾞ','デ':'ﾃﾞ','ド':'ﾄﾞ','バ':'ﾊﾞ','ビ':'ﾋﾞ','ブ':'ﾌﾞ','ベ':'ﾍﾞ','ボ':'ﾎﾞ','パ':'ﾊﾟ','ピ':'ﾋﾟ','プ':'ﾌﾟ','ペ':'ﾍﾟ','ポ':'ﾎﾟ','ヴ':'ｳﾞ','ー':'ｰ'};
+  return str.split('').map(c=>m[c]||c).join('');
+}
+
+function hlMatch(text, q){
+  if(!q) return text;
+  const lo=text.toLowerCase(), qi=q.toLowerCase();
+  const idx=lo.indexOf(qi);
+  if(idx<0){
+    // 半角変換でも試みる
+    const th=toHalfKanaC(text).toLowerCase(), qh=toHalfKanaC(q).toLowerCase();
+    const idxH=th.indexOf(qh);
+    if(idxH<0) return text;
+    return text.slice(0,idxH)+'<mark>'+text.slice(idxH,idxH+q.length)+'</mark>'+text.slice(idxH+q.length);
+  }
+  return text.slice(0,idx)+'<mark>'+text.slice(idx,idx+q.length)+'</mark>'+text.slice(idx+q.length);
+}
+
+// ソート済み顧客リスト
+const CUST_LIST = Object.keys(CUSTOMER_DATA)
   .sort((a,b)=>CUSTOMER_DATA[a].name.localeCompare(CUSTOMER_DATA[b].name,'ja'))
-  .forEach(k=>{
-    const o=document.createElement('option'); o.value=k; o.textContent=CUSTOMER_DATA[k].name; custSel.appendChild(o);
+  .map(k=>({cid:k, name:CUSTOMER_DATA[k].name}));
+
+function buildCustDropdown(q=''){
+  const dd=document.getElementById('cust-dropdown');
+  const hq=toHalfKanaC(q).toLowerCase();
+  let inner='<div class="cust-opt new-opt" data-cid="__new__" data-name="📝 新規・台帳外顧客">📝 新規・台帳外顧客</div>';
+  CUST_LIST.forEach(({cid,name})=>{
+    const lo=name.toLowerCase(), hn=toHalfKanaC(name).toLowerCase();
+    if(!q||lo.includes(q.toLowerCase())||hn.includes(hq)){
+      const esc=name.replace(/&/g,'&amp;').replace(/"/g,'&quot;');
+      inner+=`<div class="cust-opt" data-cid="${cid}" data-name="${esc}">${q?hlMatch(name,q):name}</div>`;
+    }
   });
+  dd.innerHTML=inner;
+  // クリックイベントをdelegationで処理
+  dd.onclick=(e)=>{
+    const el=e.target.closest('.cust-opt');
+    if(!el) return;
+    selectCustomer(el.dataset.cid, el.dataset.name);
+  };
+}
+
+function openCustDropdown(){
+  const inp=document.getElementById('cust-search-input');
+  inp.removeAttribute('readonly');
+  buildCustDropdown('');
+  document.getElementById('cust-dropdown').classList.add('open');
+  setTimeout(()=>{ document.addEventListener('click', custOutsideHandler, {once:true}); },0);
+}
+
+function custOutsideHandler(e){
+  if(document.getElementById('cust-search-wrap').contains(e.target)){
+    document.addEventListener('click', custOutsideHandler, {once:true});
+  } else {
+    document.getElementById('cust-dropdown').classList.remove('open');
+    const inp=document.getElementById('cust-search-input');
+    if(!custSel.value){ inp.value=''; }
+    inp.setAttribute('readonly','');
+  }
+}
+
+function filterCustomers(){
+  const q=document.getElementById('cust-search-input').value.trim();
+  buildCustDropdown(q);
+  document.getElementById('cust-dropdown').classList.add('open');
+}
+
+function selectCustomer(cid, name){
+  custSel.value=cid;
+  const inp=document.getElementById('cust-search-input');
+  inp.value = cid==='__new__' ? '📝 新規・台帳外顧客' : name;
+  inp.setAttribute('readonly','');
+  document.getElementById('cust-dropdown').classList.remove('open');
+  loadProducts();
+}
 
 const now=new Date();
 document.getElementById('hdate').innerHTML=
@@ -225,18 +335,80 @@ let selected={};
 let orderLog=[]; // {no,staff,cid,cname,items,memo,time,cancelled}
 let lastNo=0;
 
+const UNITS=['本','枚','袋','箱','ケース'];
+function unitOpts(){return UNITS.map(u=>`<option value="${u}">${u}</option>`).join('');}
+
 function loadProducts(){
   selected={};
   const cid=custSel.value;
   const list=document.getElementById('prod-list');
-  if(!cid){list.innerHTML='<div class="placeholder"><div class="ico">🏪</div><p>顧客を選ぶと<br>定番商品が表示されます</p></div>';checkReady();return;}
-  list.innerHTML='';
+  const sw=document.getElementById('prod-search-wrap');
+  const si=document.getElementById('prod-search');
+  const ncw=document.getElementById('new-cust-wrap');
+  const fiw=document.getElementById('free-items-wrap');
+  const fil=document.getElementById('free-items-list');
+
+  // 新規顧客の場合
+  if(cid==='__new__'){
+    ncw.style.display='block';
+    list.innerHTML='<div class="placeholder" style="padding:16px 0"><p style="font-size:13px;color:var(--muted)">商品は下の「商品を手入力」から追加してください</p></div>';
+    sw.style.display='none'; si.value='';
+    fiw.style.display='block'; fil.innerHTML='';
+    checkReady(); return;
+  }
+  ncw.style.display='none';
+  document.getElementById('new-cust-name').value='';
+
+  if(!cid){
+    list.innerHTML='<div class="placeholder"><div class="ico">🏪</div><p>顧客を選ぶと<br>定番商品が表示されます</p></div>';
+    sw.style.display='none'; si.value='';
+    fiw.style.display='none'; fil.innerHTML='';
+    checkReady(); return;
+  }
+  list.innerHTML=''; si.value=''; fil.innerHTML='';
   CUSTOMER_DATA[cid].products.forEach(p=>{
     const d=document.createElement('div'); d.className='prod-item'; d.id='pi-'+p.code;
-    d.innerHTML=`<div class="chk" id="chk-${p.code}"></div><div class="prod-info"><div class="prod-name">${p.name}</div><div class="prod-code">#${p.code}</div></div><input class="qty" type="number" id="qty-${p.code}" min="1" value="1" onclick="event.stopPropagation()" oninput="syncQty(${p.code})">`;
+    d.innerHTML=`<div class="chk" id="chk-${p.code}"></div><div class="prod-info"><div class="prod-name">${p.name}</div><div class="prod-code">#${p.code}</div></div><input class="qty" type="number" id="qty-${p.code}" min="1" value="1" onclick="event.stopPropagation()" oninput="syncQty(${p.code})"><select class="unit-sel" id="unit-${p.code}" onclick="event.stopPropagation()">${unitOpts()}</select>`;
     d.onclick=()=>toggleProd(p.code); list.appendChild(d);
   });
+  sw.style.display=CUSTOMER_DATA[cid].products.length>=5?'block':'none';
+  fiw.style.display='block';
   checkReady();
+}
+
+let freeItemCount=0;
+function addFreeItem(){
+  freeItemCount++;
+  const id='fi-'+freeItemCount;
+  const row=document.createElement('div'); row.className='free-item-row'; row.id=id;
+  row.innerHTML=`<input class="free-item-name" type="text" placeholder="商品名" oninput="checkReady()"><input class="free-item-qty" type="number" min="1" value="1"><select class="free-item-unit">${unitOpts()}</select><button class="free-item-del" onclick="document.getElementById('${id}').remove();checkReady()">×</button>`;
+  document.getElementById('free-items-list').appendChild(row);
+  checkReady();
+}
+
+function getFreeItems(){
+  return Array.from(document.querySelectorAll('.free-item-row')).map(row=>{
+    const name=row.querySelector('.free-item-name').value.trim();
+    const qty=parseInt(row.querySelector('.free-item-qty').value)||1;
+    const unit=row.querySelector('.free-item-unit').value;
+    return name?{code:'新規',name,qty,unit}:null;
+  }).filter(Boolean);
+}
+
+function toHalfKana(str){
+  const m={'ア':'ｱ','イ':'ｲ','ウ':'ｳ','エ':'ｴ','オ':'ｵ','カ':'ｶ','キ':'ｷ','ク':'ｸ','ケ':'ｹ','コ':'ｺ','サ':'ｻ','シ':'ｼ','ス':'ｽ','セ':'ｾ','ソ':'ｿ','タ':'ﾀ','チ':'ﾁ','ツ':'ﾂ','テ':'ﾃ','ト':'ﾄ','ナ':'ﾅ','ニ':'ﾆ','ヌ':'ﾇ','ネ':'ﾈ','ノ':'ﾉ','ハ':'ﾊ','ヒ':'ﾋ','フ':'ﾌ','ヘ':'ﾍ','ホ':'ﾎ','マ':'ﾏ','ミ':'ﾐ','ム':'ﾑ','メ':'ﾒ','モ':'ﾓ','ヤ':'ﾔ','ユ':'ﾕ','ヨ':'ﾖ','ラ':'ﾗ','リ':'ﾘ','ル':'ﾙ','レ':'ﾚ','ロ':'ﾛ','ワ':'ﾜ','ヲ':'ｦ','ン':'ﾝ','ァ':'ｧ','ィ':'ｨ','ゥ':'ｩ','ェ':'ｪ','ォ':'ｫ','ッ':'ｯ','ャ':'ｬ','ュ':'ｭ','ョ':'ｮ','ガ':'ｶﾞ','ギ':'ｷﾞ','グ':'ｸﾞ','ゲ':'ｹﾞ','ゴ':'ｺﾞ','ザ':'ｻﾞ','ジ':'ｼﾞ','ズ':'ｽﾞ','ゼ':'ｾﾞ','ゾ':'ｿﾞ','ダ':'ﾀﾞ','ヂ':'ﾁﾞ','ヅ':'ﾂﾞ','デ':'ﾃﾞ','ド':'ﾄﾞ','バ':'ﾊﾞ','ビ':'ﾋﾞ','ブ':'ﾌﾞ','ベ':'ﾍﾞ','ボ':'ﾎﾞ','パ':'ﾊﾟ','ピ':'ﾋﾟ','プ':'ﾌﾟ','ペ':'ﾍﾟ','ポ':'ﾎﾟ','ヴ':'ｳﾞ','ー':'ｰ'};
+  return str.split('').map(c=>m[c]||c).join('');
+}
+
+function filterProducts(){
+  const raw=document.getElementById('prod-search').value.trim();
+  const q=toHalfKana(raw).toLowerCase();
+  const cid=custSel.value; if(!cid)return;
+  CUSTOMER_DATA[cid].products.forEach(p=>{
+    const el=document.getElementById('pi-'+p.code); if(!el)return;
+    const t=p.name.toLowerCase();
+    el.style.display=(t.includes(q)||t.includes(raw.toLowerCase()))?'flex':'none';
+  });
 }
 
 function toggleProd(code){
@@ -249,20 +421,38 @@ function syncQty(code){if(selected[code]!==undefined)selected[code]=parseInt(doc
 
 function checkReady(){
   const n=Object.keys(selected).length;
-  document.getElementById('prod-count').textContent=n+'件選択';
+  const freeItems=getFreeItems?getFreeItems():[];
+  const total=n+freeItems.length;
+  document.getElementById('prod-count').textContent=total+'件選択';
   const btn=document.getElementById('submit-btn');
   const staff=document.getElementById('sel-staff').value, cust=custSel.value;
-  if(staff&&cust&&n>0){btn.className='submit-btn active';btn.textContent='確認・送信 ('+n+'件)';btn.disabled=false;}
-  else{btn.className='submit-btn';btn.textContent=!staff||!cust?'担当者と顧客を選択してください':'商品を1つ以上選択してください';btn.disabled=true;}
+  const newName=document.getElementById('new-cust-name')?document.getElementById('new-cust-name').value.trim():'';
+  const custOk=cust&&(cust!=='__new__'||newName);
+  if(staff&&custOk&&total>0){btn.className='submit-btn active';btn.textContent='確認・送信 ('+total+'件)';btn.disabled=false;}
+  else{
+    btn.className='submit-btn';
+    if(!staff||!cust) btn.textContent='担当者と顧客を選択してください';
+    else if(cust==='__new__'&&!newName) btn.textContent='顧客名を入力してください';
+    else btn.textContent='商品を1つ以上選択してください';
+    btn.disabled=true;
+  }
 }
 
 function showConfirm(){
-  const staff=document.getElementById('sel-staff').value, cid=custSel.value, cname=CUSTOMER_DATA[cid].name, memo=document.getElementById('memo').value;
-  document.getElementById('cf-meta').textContent=staff+' › '+cname;
+  const staff=document.getElementById('sel-staff').value, cid=custSel.value;
+  const cname=cid==='__new__'?document.getElementById('new-cust-name').value.trim():(CUSTOMER_DATA[cid]?CUSTOMER_DATA[cid].name:cid);
+  const memo=document.getElementById('memo').value;
+  document.getElementById('cf-meta').textContent=staff+' › '+cname+(cid==='__new__'?' 【新規】':'');
   let html='';
-  Object.keys(selected).forEach(code=>{
-    const p=CUSTOMER_DATA[cid].products.find(x=>x.code==code), qty=document.getElementById('qty-'+code).value;
-    html+=`<div class="cf-item"><span class="cf-name">${p.name}</span><span class="cf-qty">${qty} 個</span></div>`;
+  if(cid!=='__new__'){
+    Object.keys(selected).forEach(code=>{
+      const p=CUSTOMER_DATA[cid].products.find(x=>x.code==code), qty=document.getElementById('qty-'+code).value;
+      const unit=document.getElementById('unit-'+code)?document.getElementById('unit-'+code).value:'';
+      html+=`<div class="cf-item"><span class="cf-name">${p.name}</span><span class="cf-qty">${qty} ${unit}</span></div>`;
+    });
+  }
+  getFreeItems().forEach(item=>{
+    html+=`<div class="cf-item"><span class="cf-name">${item.name} <span style="font-size:11px;color:#e08;font-weight:700">手入力</span></span><span class="cf-qty">${item.qty} ${item.unit}</span></div>`;
   });
   document.getElementById('cf-items').innerHTML=html;
   document.getElementById('cf-memo').innerHTML=memo?`<div style="margin-top:10px;padding:10px;background:#f5f5f2;border-radius:8px;font-size:13px;color:#555">📝 ${memo}</div>`:'';
@@ -272,21 +462,35 @@ function closeOverlay(){document.getElementById('overlay').classList.remove('sho
 
 function submitOrder(){
   closeOverlay();
-  const staff=document.getElementById('sel-staff').value, cid=custSel.value, cname=CUSTOMER_DATA[cid].name, memo=document.getElementById('memo').value;
+  const staff=document.getElementById('sel-staff').value, cid=custSel.value, memo=document.getElementById('memo').value;
   const timeStr=new Date().toLocaleTimeString('ja-JP',{hour:'2-digit',minute:'2-digit'});
-  const items=Object.keys(selected).map(code=>{
+  const isNew=cid==='__new__';
+  const cname=isNew?document.getElementById('new-cust-name').value.trim():(CUSTOMER_DATA[cid]?CUSTOMER_DATA[cid].name:cid);
+  const regularItems=isNew?[]:Object.keys(selected).map(code=>{
     const p=CUSTOMER_DATA[cid].products.find(x=>x.code==code);
-    return{code:p.code,name:p.name,qty:parseInt(document.getElementById('qty-'+code).value)||1};
+    const unit=document.getElementById('unit-'+code)?document.getElementById('unit-'+code).value:'';
+    return{code:p.code,name:p.name,qty:parseInt(document.getElementById('qty-'+code).value)||1,unit};
   });
+  const items=[...regularItems,...getFreeItems()];
   lastNo++;
   const no=lastNo;
-  const payload={staff,customerCode:cid,customer:cname,time:timeStr,memo,items,cancelled:false};
+  const payload={staff,customerCode:isNew?'新規':cid,customer:cname,time:timeStr,memo,items,cancelled:false,isNew:isNew};
 
   const sendBtn=document.getElementById('btn-send');
   if(sendBtn){sendBtn.disabled=true;sendBtn.textContent='送信中...';}
 
-  fetch(GAS_URL,{method:'POST',mode:'no-cors',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)})
-  .finally(()=>{
+  fetch(GAS_URL,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)})
+  .then(r=>r.json())
+  .then(res=>{
+    const gasRow=res.row||null;
+    orderLog.push({no,staff,cid,cname,items,memo,time:timeStr,cancelled:false,gasRow});
+    renderLog();
+    document.getElementById('s-msg').textContent=`${cname}\n${items.length}品目を記録しました（${no}件目）\n${timeStr}`;
+    document.getElementById('success').classList.add('show');
+    if(sendBtn){sendBtn.disabled=false;sendBtn.textContent='送信する ✓';}
+  })
+  .catch(()=>{
+    // 通信失敗時はgasRow無しで記録（取消は時刻検索にフォールバック）
     orderLog.push({no,staff,cid,cname,items,memo,time:timeStr,cancelled:false,gasRow:null});
     renderLog();
     document.getElementById('s-msg').textContent=`${cname}\n${items.length}品目を記録しました（${no}件目）\n${timeStr}`;
@@ -296,14 +500,15 @@ function submitOrder(){
 }
 
 function cancelOrder(no){
-  if(!confirm((no)+'件目の注文を取り消しますか？\nスプレッドシートに「取消」として記録されます。'))return;
+  if(!confirm((no)+'件目の注文を取り消しますか？\nスプレッドシートの該当行を取消に更新します。'))return;
   const o=orderLog.find(x=>x.no===no);
   if(!o)return;
   o.cancelled=true;
-  // GASに取消通知
-  const payload={type:'cancel',staff:o.staff,customerCode:o.cid,customer:o.cname,time:o.time,memo:o.memo,items:o.items,cancelled:true};
-  fetch(GAS_URL,{method:'POST',mode:'no-cors',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)});
   renderLog();
+  // GASに取消通知（行番号があれば行番号で、なければ時刻で検索）
+  const payload={type:'cancel',gasRow:o.gasRow||null,staff:o.staff,customerCode:o.cid,customer:o.cname,time:o.time};
+  fetch(GAS_URL,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)})
+  .catch(()=>{console.warn('取消通知の送信に失敗しました');});
 }
 
 function renderLog(){
@@ -319,7 +524,7 @@ function renderLog(){
       <div class="log-num ${o.cancelled?'cancelled-num':''}">${o.no}</div>
       <div class="log-body">
         <div><span class="log-cname">${o.cname}</span><span class="log-time">${o.time}</span><span style="font-size:11px;color:#888;margin-left:4px">${o.staff}</span>${o.cancelled?'<span style="margin-left:8px;font-size:11px;color:#c0392b;font-weight:700">【取消済】</span>':''}</div>
-        <div class="log-items">${o.items.map(i=>i.name+'×'+i.qty).join('　')}</div>
+        <div class="log-items">${o.items.map(i=>i.name+' '+i.qty+(i.unit?' '+i.unit:'')).join('　')}</div>
         ${o.memo?`<div style="font-size:11px;color:#888;margin-top:2px">📝 ${o.memo}</div>`:''}
       </div>
       ${o.cancelled
@@ -341,7 +546,7 @@ function buildPrintHTML(orders){
         <td class="col-check">${isCancelled?'✕':'□'}</td>
         <td class="col-code">#${i.code}</td>
         <td class="col-name">${i.name}</td>
-        <td class="col-qty">${i.qty}</td>
+        <td class="col-qty">${i.qty}${i.unit?' '+i.unit:''}</td>
       </tr>`).join('');
     return `
       <div class="order-block ${isCancelled?'cancelled-block':''}">
@@ -392,8 +597,18 @@ function resetForm(){
   document.getElementById('success').classList.remove('show');
   selected={};
   custSel.value='';
+  document.getElementById('cust-search-input').value='';
+  document.getElementById('cust-search-input').setAttribute('readonly','');
+  document.getElementById('cust-dropdown').classList.remove('open');
   document.getElementById('memo').value='';
   document.getElementById('prod-list').innerHTML='<div class="placeholder"><div class="ico">🏪</div><p>顧客を選ぶと<br>定番商品が表示されます</p></div>';
+  document.getElementById('prod-search').value='';
+  document.getElementById('prod-search-wrap').style.display='none';
+  document.getElementById('new-cust-wrap').style.display='none';
+  document.getElementById('new-cust-name').value='';
+  document.getElementById('free-items-wrap').style.display='none';
+  document.getElementById('free-items-list').innerHTML='';
+  freeItemCount=0;
   checkReady();
 }
 </script>
