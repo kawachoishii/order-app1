@@ -479,18 +479,8 @@ function submitOrder(){
   const sendBtn=document.getElementById('btn-send');
   if(sendBtn){sendBtn.disabled=true;sendBtn.textContent='送信中...';}
 
-  fetch(GAS_URL,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)})
-  .then(r=>r.json())
-  .then(res=>{
-    const gasRow=res.row||null;
-    orderLog.push({no,staff,cid,cname,items,memo,time:timeStr,cancelled:false,gasRow});
-    renderLog();
-    document.getElementById('s-msg').textContent=`${cname}\n${items.length}品目を記録しました（${no}件目）\n${timeStr}`;
-    document.getElementById('success').classList.add('show');
-    if(sendBtn){sendBtn.disabled=false;sendBtn.textContent='送信する ✓';}
-  })
-  .catch(()=>{
-    // 通信失敗時はgasRow無しで記録（取消は時刻検索にフォールバック）
+  fetch(GAS_URL,{method:'POST',mode:'no-cors',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)})
+  .finally(()=>{
     orderLog.push({no,staff,cid,cname,items,memo,time:timeStr,cancelled:false,gasRow:null});
     renderLog();
     document.getElementById('s-msg').textContent=`${cname}\n${items.length}品目を記録しました（${no}件目）\n${timeStr}`;
@@ -507,8 +497,7 @@ function cancelOrder(no){
   renderLog();
   // GASに取消通知（行番号があれば行番号で、なければ時刻で検索）
   const payload={type:'cancel',gasRow:o.gasRow||null,staff:o.staff,customerCode:o.cid,customer:o.cname,time:o.time};
-  fetch(GAS_URL,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)})
-  .catch(()=>{console.warn('取消通知の送信に失敗しました');});
+  fetch(GAS_URL,{method:'POST',mode:'no-cors',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)});
 }
 
 function renderLog(){
