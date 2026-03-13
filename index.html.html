@@ -1,0 +1,401 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+<title>受注入力システム</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;500;700&family=DM+Mono:wght@400;500&display=swap');
+  :root{--bg:#f2f0eb;--surface:#fffefb;--primary:#1b3d2f;--primary2:#2a6049;--accent:#d94f1a;--text:#1a1a1a;--muted:#666;--border:#d8d3cb;--shadow:0 2px 10px rgba(0,0,0,0.07);--danger:#c0392b;}
+  *{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent;}
+  body{font-family:'Noto Sans JP',sans-serif;background:var(--bg);color:var(--text);min-height:100vh;}
+
+  .header{background:var(--primary);color:white;padding:14px 16px;display:flex;align-items:center;gap:10px;position:sticky;top:0;z-index:100;box-shadow:0 2px 8px rgba(0,0,0,0.25);}
+  .h-icon{width:34px;height:34px;background:var(--accent);border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:17px;flex-shrink:0;}
+  .h-title{font-size:15px;font-weight:700;}
+  .h-sub{font-size:11px;opacity:0.65;}
+  .h-date{margin-left:auto;font-family:'DM Mono',monospace;font-size:11px;opacity:0.7;text-align:right;}
+
+  .container{max-width:540px;margin:0 auto;padding:16px 14px 130px;}
+  .card{background:var(--surface);border-radius:14px;border:1px solid var(--border);padding:16px;margin-bottom:14px;box-shadow:var(--shadow);}
+  .card-label{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:0.08em;color:var(--muted);margin-bottom:8px;}
+
+  select{width:100%;padding:12px 14px;border:1.5px solid var(--border);border-radius:9px;font-family:'Noto Sans JP',sans-serif;font-size:15px;background:white;color:var(--text);appearance:none;outline:none;transition:border-color 0.2s;}
+  select:focus{border-color:var(--primary);}
+  .sel-wrap{position:relative;}
+  .sel-wrap::after{content:'▾';position:absolute;right:13px;top:50%;transform:translateY(-50%);pointer-events:none;color:var(--muted);font-size:12px;}
+
+  .prod-header{display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;}
+  .prod-count{font-size:11px;color:var(--muted);font-family:'DM Mono',monospace;background:#eee;padding:3px 8px;border-radius:10px;}
+  .prod-item{display:flex;align-items:center;gap:10px;padding:11px 12px;border:1.5px solid var(--border);border-radius:9px;margin-bottom:7px;background:white;transition:all 0.15s;cursor:pointer;user-select:none;}
+  .prod-item.selected{border-color:var(--primary);background:#eef5f1;}
+  .chk{width:22px;height:22px;border:2px solid var(--border);border-radius:6px;display:flex;align-items:center;justify-content:center;flex-shrink:0;font-size:13px;font-weight:700;transition:all 0.15s;color:white;}
+  .prod-item.selected .chk{background:var(--primary);border-color:var(--primary);}
+  .prod-info{flex:1;min-width:0;}
+  .prod-name{font-size:13px;font-weight:500;line-height:1.4;}
+  .prod-code{font-size:10px;color:var(--muted);font-family:'DM Mono',monospace;}
+  .qty{width:64px;padding:7px 6px;font-size:15px;text-align:center;border-radius:7px;border:1.5px solid var(--border);font-family:'DM Mono',monospace;background:white;flex-shrink:0;}
+  .prod-item.selected .qty{border-color:var(--primary2);}
+  .placeholder{text-align:center;padding:36px 16px;color:var(--muted);}
+  .placeholder .ico{font-size:38px;margin-bottom:10px;}
+  .placeholder p{font-size:13px;line-height:1.7;}
+  textarea{width:100%;padding:11px 13px;border:1.5px solid var(--border);border-radius:9px;font-family:'Noto Sans JP',sans-serif;font-size:14px;resize:none;height:72px;background:white;outline:none;}
+  textarea:focus{border-color:var(--primary);}
+
+  /* 受注ログ */
+  .log-card{background:var(--surface);border-radius:14px;border:1px solid var(--border);overflow:hidden;margin-bottom:14px;box-shadow:var(--shadow);}
+  .log-card-header{background:var(--primary);color:white;padding:12px 16px;display:flex;align-items:center;justify-content:space-between;}
+  .log-card-title{font-size:13px;font-weight:700;}
+  .log-badge{background:var(--accent);color:white;font-size:11px;font-weight:700;padding:3px 9px;border-radius:10px;font-family:'DM Mono',monospace;}
+  .log-empty{padding:18px;text-align:center;font-size:13px;color:var(--muted);}
+  .log-row{display:flex;gap:10px;padding:11px 14px;border-bottom:1px solid var(--border);align-items:flex-start;font-size:13px;}
+  .log-row.cancelled{opacity:0.4;}
+  .log-row:last-child{border-bottom:none;}
+  .log-num{font-family:'DM Mono',monospace;font-size:11px;color:white;background:var(--primary2);width:22px;height:22px;border-radius:50%;display:flex;align-items:center;justify-content:center;flex-shrink:0;font-weight:700;margin-top:1px;}
+  .log-num.cancelled-num{background:#aaa;}
+  .log-body{flex:1;min-width:0;}
+  .log-cname{font-weight:700;font-size:14px;}
+  .log-time{font-size:11px;color:var(--muted);font-family:'DM Mono',monospace;margin-left:6px;}
+  .log-items{font-size:12px;color:#555;margin-top:3px;line-height:1.6;}
+  .log-cancel-btn{flex-shrink:0;padding:5px 10px;border:1.5px solid #e0b0aa;background:white;color:var(--danger);border-radius:7px;font-size:11px;font-weight:700;cursor:pointer;font-family:'Noto Sans JP',sans-serif;}
+  .log-cancel-btn:disabled{border-color:#ddd;color:#bbb;cursor:not-allowed;}
+  .cancelled-label{flex-shrink:0;font-size:11px;color:#aaa;font-weight:700;}
+  .print-all-btn{width:100%;padding:13px;background:var(--primary);color:white;border:none;font-family:'Noto Sans JP',sans-serif;font-size:14px;font-weight:700;cursor:pointer;}
+  .print-all-btn:disabled{background:#ccc;color:#999;cursor:not-allowed;}
+
+  .submit-bar{position:fixed;bottom:0;left:0;right:0;background:white;border-top:1px solid var(--border);padding:12px 14px;z-index:100;}
+  .submit-btn{width:100%;max-width:540px;display:block;margin:0 auto;padding:15px;background:var(--border);color:var(--muted);border:none;border-radius:11px;font-family:'Noto Sans JP',sans-serif;font-size:15px;font-weight:700;cursor:not-allowed;transition:all 0.2s;}
+  .submit-btn.active{background:var(--accent);color:white;cursor:pointer;}
+
+  .overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,0.55);z-index:200;align-items:flex-end;justify-content:center;}
+  .overlay.show{display:flex;}
+  .sheet{background:var(--surface);border-radius:18px 18px 0 0;padding:22px 18px 36px;width:100%;max-width:540px;max-height:85vh;overflow-y:auto;}
+  .sheet h2{font-size:17px;font-weight:700;margin-bottom:4px;}
+  .sheet .meta{font-size:13px;color:var(--muted);margin-bottom:18px;}
+  .cf-item{display:flex;justify-content:space-between;align-items:center;padding:9px 0;border-bottom:1px solid var(--border);font-size:13px;gap:10px;}
+  .cf-item:last-of-type{border-bottom:none;}
+  .cf-name{flex:1;line-height:1.4;}
+  .cf-qty{font-family:'DM Mono',monospace;font-weight:700;color:var(--primary);white-space:nowrap;}
+  .cf-btns{display:flex;gap:8px;margin-top:18px;}
+  .btn-back{flex:1;padding:13px;border:2px solid var(--border);background:white;border-radius:9px;font-family:'Noto Sans JP',sans-serif;font-size:14px;cursor:pointer;}
+  .btn-send{flex:2;padding:13px;background:var(--accent);color:white;border:none;border-radius:9px;font-family:'Noto Sans JP',sans-serif;font-size:15px;font-weight:700;cursor:pointer;}
+
+  .success{display:none;position:fixed;inset:0;background:var(--primary);z-index:300;flex-direction:column;align-items:center;justify-content:center;color:white;text-align:center;padding:36px;}
+  .success.show{display:flex;}
+  .s-icon{width:76px;height:76px;background:rgba(255,255,255,0.15);border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:38px;margin-bottom:22px;animation:pop .35s ease;}
+  @keyframes pop{0%{transform:scale(0)}75%{transform:scale(1.12)}100%{transform:scale(1)}}
+  .success h2{font-size:22px;margin-bottom:8px;}
+  .success p{font-size:13px;opacity:0.75;margin-bottom:28px;line-height:1.8;white-space:pre-line;}
+  .s-btns{display:flex;gap:10px;}
+  .btn-print-now{padding:14px 28px;background:rgba(255,255,255,0.2);color:white;border:2px solid rgba(255,255,255,0.5);border-radius:10px;font-family:'Noto Sans JP',sans-serif;font-size:15px;font-weight:700;cursor:pointer;}
+  .btn-next{padding:14px 28px;background:white;color:var(--primary);border:none;border-radius:10px;font-family:'Noto Sans JP',sans-serif;font-size:15px;font-weight:700;cursor:pointer;}
+
+  /* 印刷スタイル */
+  @media print {
+    @page { size: A4; margin: 15mm 12mm; }
+    body > *:not(#print-area){ display:none!important; }
+    #print-area{ display:block!important; font-family:'Noto Sans JP','メイリオ',sans-serif; }
+
+    .print-page-header{ border-bottom:3px solid #1b3d2f; padding-bottom:10px; margin-bottom:18px; }
+    .print-page-header h1{ font-size:22pt; font-weight:700; color:#1b3d2f; }
+    .print-page-header .ph-meta{ font-size:10pt; color:#555; margin-top:4px; }
+
+    .order-block{ page-break-inside:avoid; margin-bottom:20px; border:1.5px solid #bbb; border-radius:4px; overflow:hidden; }
+    .order-block.cancelled-block{ opacity:0.4; }
+
+    .ob-header{ background:#1b3d2f; color:white; padding:8px 12px; display:flex; justify-content:space-between; align-items:center; }
+    .ob-seq{ font-size:9pt; opacity:0.8; }
+    .ob-cname{ font-size:15pt; font-weight:700; }
+    .ob-code{ font-size:9pt; opacity:0.8; margin-top:1px; }
+    .ob-meta{ font-size:9pt; opacity:0.8; text-align:right; }
+    .cancelled-stamp{ background:#c0392b; color:white; font-size:9pt; font-weight:700; padding:2px 8px; border-radius:3px; }
+
+    .ob-table{ width:100%; border-collapse:collapse; }
+    .ob-table th{ background:#eef5f1; font-size:10pt; font-weight:700; padding:7px 10px; border:1px solid #ccc; text-align:center; }
+    .ob-table td{ font-size:12pt; padding:9px 10px; border:1px solid #ccc; vertical-align:middle; line-height:1.4; }
+    .ob-table .col-check{ width:36px; text-align:center; font-size:14pt; }
+    .ob-table .col-code{ width:70px; text-align:center; font-size:10pt; color:#555; }
+    .ob-table .col-name{ text-align:left; }
+    .ob-table .col-qty{ width:55px; text-align:center; font-weight:700; font-size:13pt; }
+    .ob-table tr:nth-child(even) td{ background:#fafafa; }
+
+    .ob-memo{ padding:7px 12px; background:#fffbf0; border-top:1px dashed #ccc; font-size:10pt; color:#555; }
+    .print-footer{ margin-top:14px; font-size:8pt; color:#aaa; text-align:right; }
+  }
+  #print-area{ display:none; }
+</style>
+</head>
+<body>
+<div class="header">
+  <div class="h-icon">📦</div>
+  <div><div class="h-title">受注入力システム</div><div class="h-sub">営業担当者用</div></div>
+  <div class="h-date" id="hdate"></div>
+</div>
+
+<div class="container">
+  <div class="card">
+    <div class="card-label">担当者</div>
+    <div class="sel-wrap">
+      <select id="sel-staff" onchange="checkReady()">
+        <option value="">選択してください</option>
+        <option>貞清</option><option>河村</option><option>佐藤</option><option>石井</option>
+        <option>江田</option><option>小野</option><option>野村</option><option>末広</option>
+        <option>川原</option><option>○○</option>
+      </select>
+    </div>
+  </div>
+  <div class="card">
+    <div class="card-label">顧客</div>
+    <div class="sel-wrap">
+      <select id="sel-customer" onchange="loadProducts()">
+        <option value="">顧客を選択してください</option>
+      </select>
+    </div>
+  </div>
+  <div class="card">
+    <div class="prod-header">
+      <div class="card-label" style="margin-bottom:0">注文商品</div>
+      <div class="prod-count" id="prod-count">0件選択</div>
+    </div>
+    <div id="prod-list">
+      <div class="placeholder"><div class="ico">🏪</div><p>顧客を選ぶと<br>定番商品が表示されます</p></div>
+    </div>
+  </div>
+  <div class="card">
+    <div class="card-label">メモ（任意）</div>
+    <textarea id="memo" placeholder="特記事項があれば入力…"></textarea>
+  </div>
+  <div class="log-card" id="log-card" style="display:none;">
+    <div class="log-card-header">
+      <div class="log-card-title">📋 本日の受注ログ</div>
+      <div class="log-badge" id="log-badge">0件</div>
+    </div>
+    <div id="log-body"><div class="log-empty">まだ受注がありません</div></div>
+    <button class="print-all-btn" id="print-all-btn" onclick="printAll()" disabled>🖨️ まとめて印刷（取消を除く全件）</button>
+  </div>
+</div>
+
+<div class="submit-bar">
+  <button class="submit-btn" id="submit-btn" onclick="showConfirm()">担当者と顧客を選択してください</button>
+</div>
+
+<div class="overlay" id="overlay">
+  <div class="sheet">
+    <h2>📋 注文内容の確認</h2>
+    <div class="meta" id="cf-meta"></div>
+    <div id="cf-items"></div>
+    <div id="cf-memo"></div>
+    <div class="cf-btns">
+      <button class="btn-back" onclick="closeOverlay()">修正する</button>
+      <button class="btn-send" id="btn-send" onclick="submitOrder()">送信する ✓</button>
+    </div>
+  </div>
+</div>
+
+<div class="success" id="success">
+  <div class="s-icon">✓</div>
+  <h2>送信完了！</h2>
+  <p id="s-msg"></p>
+  <div class="s-btns">
+    <button class="btn-print-now" onclick="printLatest()">🖨️ この1件を印刷</button>
+    <button class="btn-next" onclick="resetForm()">次の顧客へ</button>
+  </div>
+</div>
+
+<div id="print-area"></div>
+
+<script>
+const CUSTOMER_DATA = {"10001": {"name": "その他 個人 (日田市内)", "products": [{"code": 104, "name": "KV280匁ｺｰﾏ糸ﾀｵﾙ/白"}, {"code": 34, "name": "200匁総ﾊﾟｲﾙF/T ﾌﾞﾙｰ"}, {"code": 35, "name": "200匁総ﾊﾟｲﾙF/T ｲｴﾛｰ"}, {"code": 36, "name": "200匁総ﾊﾟｲﾙF/T ﾋﾟﾝｸ"}, {"code": 37, "name": "200匁総ﾊﾟｲﾙF/T ｸﾞﾘｰﾝ"}, {"code": 38, "name": "200匁総ﾊﾟｲﾙF/T ｺﾞｰﾙﾄﾞ"}, {"code": 40, "name": "【新】KV白ﾀｵﾙ160匁平付"}, {"code": 41, "name": "KV白ﾀｵﾙ180匁平付"}, {"code": 42, "name": "KV白ﾀｵﾙ200匁平付"}, {"code": 43, "name": "KV白ﾀｵﾙ220匁平付"}, {"code": 49, "name": "KV白おしぼり 100匁"}, {"code": 59, "name": "KAくまﾓﾝﾀｵﾙ 260匁"}, {"code": 94, "name": "(KV)輸入商品ﾍﾞﾄﾅﾑ"}, {"code": 96, "name": "子供用不織布ｽﾘｯﾊﾟ ﾌﾞﾗｳﾝ"}, {"code": 97, "name": "(KV)ﾆﾄﾘﾙ手袋 粉無し ﾌﾞﾙｰ"}, {"code": 1006, "name": "MO元禄箸･裸"}, {"code": 1007, "name": "ｱｽﾍﾟﾝ元禄天削箸"}, {"code": 1022, "name": "阿蘇くじゅう連山の天然水 ｼｰﾙ付"}, {"code": 1023, "name": "炭酸水 AQUA 500ml"}, {"code": 1032, "name": "おしぼり KT1500丸 乳白ﾌｨﾙﾑ無地"}, {"code": 1033, "name": "Hｶﾐｿﾘ2枚刃CM袋入"}, {"code": 239, "name": "摂津製油 ﾕｰﾋﾞｺｰﾙ75 5L"}, {"code": 301, "name": "ｾｰﾌｺｰﾙ58S 5L ｱﾙｺｰﾙ製剤"}, {"code": 383, "name": "ｻﾗﾝﾗｯﾌﾟ業務用 22×50 BOXﾀｲﾌﾟ"}, {"code": 406, "name": "ﾎﾞﾃﾞｨﾀｵﾙ BT-1788"}, {"code": 494, "name": "紙おしぼり RICH CLEAN 無地"}, {"code": 498, "name": "便器巻紙　消毒済"}, {"code": 526, "name": "伊藤園 業務用緑茶TBﾊﾞﾗ1.8g"}, {"code": 576, "name": "ﾀﾞｲｱﾗｯﾌﾟ 30cm×100m"}, {"code": 596, "name": "ﾀﾞｲｱﾗｯﾌﾟ 15cm×100m"}, {"code": 620, "name": "3M ｽﾎﾟﾝｼﾞｴｰｽ S"}, {"code": 663, "name": "子供ﾄﾗﾍﾞﾙｾｯﾄ ﾊﾟﾝﾀﾞ3色ｱｿｰﾄ"}, {"code": 670, "name": "(ｱﾝ)ｱﾝｼｱ"}, {"code": 696, "name": "(ﾀﾞｲ)大黒工業"}, {"code": 707, "name": "(ｻﾝ)ｻﾝﾖｰｱﾒﾆﾃｨ"}, {"code": 710, "name": "(ｼｮｳ)尚美堂"}, {"code": 712, "name": "(ｼｹﾞ)重光商事"}, {"code": 720, "name": "(ﾄﾑ)ﾄﾑｽ"}, {"code": 722, "name": "(ﾜｿ)WASOO ﾜｿｰ"}, {"code": 733, "name": "(ﾅｶ)中田産業"}, {"code": 736, "name": "(ﾋﾗ)平井星光堂"}, {"code": 782, "name": "ｼｬﾜｰｷｬｯﾌﾟ SM"}, {"code": 784, "name": "2ﾂ折ｽﾘﾑﾌﾞﾗｼ SM"}, {"code": 788, "name": "不織布ｽﾘｯﾊﾟ 白"}, {"code": 792, "name": "ﾚﾃﾞｨｰｽｾｯﾄ SM(ｺﾞﾑ/ｺｯﾄﾝ2/綿棒2)"}, {"code": 797, "name": "24W ﾊﾌﾞﾗｼ SM 3g（白）"}, {"code": 963, "name": "TM43 業務用ﾎﾟﾘ袋 45L透明/0.025"}]}, "10002": {"name": "華　大　和", "products": [{"code": 1001, "name": "竹割箸21cm(双生)"}, {"code": 1058, "name": "ﾍｲｺｰ天ぷら敷紙 500枚入"}, {"code": 455, "name": "(ﾏｲﾝ)虹の紙 10角 200枚"}, {"code": 576, "name": "ﾀﾞｲｱﾗｯﾌﾟ 30cm×100m"}, {"code": 589, "name": "ｱﾙﾐﾎｲﾙE 30cm×50m"}, {"code": 608, "name": "ｸｯｷﾝｸﾞﾍﾟｰﾊﾟｰ ｿﾌﾄ 大"}, {"code": 969, "name": "P-73 業務用ﾎﾟﾘ袋 70L 透明/0.04"}]}, "10003": {"name": "蔵屋", "products": [{"code": 700, "name": "(ﾌｸ)福井ｸﾗﾌﾄ"}]}, "10005": {"name": "日田の宿　よろづや", "products": [{"code": 162, "name": "ｶｴﾝ ﾆｭｰｴｰｽ E20 固形燃料"}, {"code": 710, "name": "(ｼｮｳ)尚美堂"}, {"code": 722, "name": "(ﾜｿ)WASOO ﾜｿｰ"}, {"code": 732, "name": "(TKG)遠藤商事"}]}, "10006": {"name": "寶屋", "products": [{"code": 1030, "name": "ｶｴﾝ ﾆｭｰｴｰｽ E25 固形燃料【新】"}, {"code": 162, "name": "ｶｴﾝ ﾆｭｰｴｰｽ E20 固形燃料"}, {"code": 300, "name": "ｾｰﾌｺｰﾙ58S 20L(BIB) ｱﾙｺｰﾙ製剤"}, {"code": 439, "name": "(ﾏｲﾝ)朝日化工"}, {"code": 677, "name": "(EBM)江部松商事"}, {"code": 700, "name": "(ﾌｸ)福井ｸﾗﾌﾄ"}, {"code": 732, "name": "(TKG)遠藤商事"}, {"code": 840, "name": "(ｱﾃﾞ)ｱﾃﾞﾘｱ"}]}, "10008": {"name": "すばるこども園", "products": [{"code": 190, "name": "ﾄｲﾚｯﾄﾍﾟｰﾊﾟｰ ｲｯﾄｺSLIM1R100S"}, {"code": 347, "name": "新】花王液体ﾋﾞｯｸ(ﾊﾞｲｵ酵素)"}]}, "10012": {"name": "春光園", "products": [{"code": 172, "name": "ｶｴﾝ ﾆｭｰｴｰｽ E20 ﾊﾞﾗ 固形燃料"}, {"code": 494, "name": "紙おしぼり RICH CLEAN 無地"}, {"code": 673, "name": "(ｻｶ)坂井硝子"}, {"code": 687, "name": "(ﾐｿﾞ)溝端"}]}, "10013": {"name": "若の屋旅館", "products": [{"code": 1030, "name": "ｶｴﾝ ﾆｭｰｴｰｽ E25 固形燃料【新】"}, {"code": 138, "name": "KS足袋 ｸﾞﾚｰ No10-A19 滑止無"}, {"code": 188, "name": "ﾄｲﾚｯﾄﾍﾟｰﾊﾟｰ THE SMILE 1R130m"}, {"code": 696, "name": "(ﾀﾞｲ)大黒工業"}, {"code": 700, "name": "(ﾌｸ)福井ｸﾗﾌﾄ"}]}, "10016": {"name": "有限会社　ひなの里", "products": [{"code": 24, "name": "KV140匁平付白ﾀｵﾙﾎﾟﾘ袋詰め"}, {"code": 1003, "name": "竹天削箸24cm"}, {"code": 1028, "name": "6折ﾅﾌｷﾝ 白 山型"}, {"code": 1032, "name": "おしぼり KT1500丸 乳白ﾌｨﾙﾑ無地"}, {"code": 1036, "name": "ｼﾝｶﾞｰﾆﾄﾘﾙSAT ﾌﾞﾙｰ M"}, {"code": 1058, "name": "ﾍｲｺｰ天ぷら敷紙 500枚入"}, {"code": 1066, "name": "ﾏｲｺﾝﾛ専用ﾎﾞﾝﾍﾞ ﾏｲﾎﾞﾝﾍﾞ･L(K)"}, {"code": 1089, "name": "ﾌｼﾞﾊｲﾊﾟｰﾆﾄﾘﾙｸﾞﾛｰﾌﾞ粉ﾅｼ青 M"}, {"code": 146, "name": "【新】KA消毒済ｺｯﾌﾟ袋"}, {"code": 151, "name": "▼ｱｲﾎﾞﾝﾍﾞPB-250-I"}, {"code": 190, "name": "ﾄｲﾚｯﾄﾍﾟｰﾊﾟｰ ｲｯﾄｺSLIM1R100S"}, {"code": 205, "name": "ｴﾘｴｰﾙ ﾍﾟｰﾊﾟｰﾀｵﾙS 小判 200枚"}, {"code": 288, "name": "ﾋﾞｰﾊﾞｰｺﾝｸｺﾝﾊﾟｸﾄ 750g×4袋"}, {"code": 295, "name": "ﾆｲﾀｶ ﾌﾞﾘｰﾁ 5.5k 漂白剤"}, {"code": 301, "name": "ｾｰﾌｺｰﾙ58S 5L ｱﾙｺｰﾙ製剤"}, {"code": 304, "name": "ﾆｭｰｹﾐｸｰﾙ 4K(E-1) 油汚れ落とし"}, {"code": 310, "name": "ﾆｲﾀｶ 除菌ﾄｲﾚｸﾘｰﾅｰ 5K"}, {"code": 340, "name": "花王ｿﾌﾀｰ 4.5L"}, {"code": 380, "name": "ﾙｰｽﾀｰLK-3ｸﾛｽｸﾘｰﾅｰ台紙"}, {"code": 406, "name": "ﾎﾞﾃﾞｨﾀｵﾙ BT-1788"}, {"code": 422, "name": "業務用洗濯洗剤 ｽｸﾘｯﾄ 5kg"}, {"code": 576, "name": "ﾀﾞｲｱﾗｯﾌﾟ 30cm×100m"}, {"code": 578, "name": "ﾀﾞｲｱﾗｯﾌﾟ 45cm×100m"}, {"code": 589, "name": "ｱﾙﾐﾎｲﾙE 30cm×50m"}, {"code": 608, "name": "ｸｯｷﾝｸﾞﾍﾟｰﾊﾟｰ ｿﾌﾄ 大"}, {"code": 609, "name": "ｸｯｷﾝｸﾞﾍﾟｰﾊﾟｰ ｿﾌﾄ 中"}, {"code": 614, "name": "ﾌｼﾞｽｰﾊﾟｰｶｳﾝﾀｰｸﾛｽ 厚手 60枚"}, {"code": 620, "name": "3M ｽﾎﾟﾝｼﾞｴｰｽ S"}, {"code": 627, "name": "ｻﾝﾄﾞｸﾘｰﾝ 中目(大)"}, {"code": 628, "name": "ｻﾝﾄﾞｸﾘｰﾝ 細目"}, {"code": 639, "name": "ﾄｰﾁﾒｲﾄ190ｶﾞｽ"}, {"code": 689, "name": "(ｻﾝ)山陽刷子"}, {"code": 695, "name": "(ｺﾏ)小間清"}, {"code": 696, "name": "(ﾀﾞｲ)大黒工業"}, {"code": 697, "name": "(ﾆｲ)ﾆｲﾀｶ"}, {"code": 700, "name": "(ﾌｸ)福井ｸﾗﾌﾄ"}, {"code": 882, "name": "LK10 03規格袋紐付 透明 100枚"}, {"code": 885, "name": "LK13 03規格袋紐付 透明 100枚"}, {"code": 887, "name": "LK15 03規格袋紐付 透明 100枚"}, {"code": 891, "name": "LK19 03規格袋紐付 透明 100枚"}, {"code": 892, "name": "LK20 03規格袋紐付 透明 100枚"}, {"code": 963, "name": "TM43 業務用ﾎﾟﾘ袋 45L透明/0.025"}, {"code": 969, "name": "P-73 業務用ﾎﾟﾘ袋 70L 透明/0.04"}, {"code": 982, "name": "ｸｯｸﾊﾟｰEG 33×30m BOXﾀｲﾌﾟ"}]}, "10017": {"name": "風早", "products": [{"code": 138, "name": "KS足袋 ｸﾞﾚｰ No10-A19 滑止無"}, {"code": 146, "name": "【新】KA消毒済ｺｯﾌﾟ袋"}, {"code": 689, "name": "(ｻﾝ)山陽刷子"}, {"code": 784, "name": "2ﾂ折ｽﾘﾑﾌﾞﾗｼ SM"}, {"code": 885, "name": "LK13 03規格袋紐付 透明 100枚"}, {"code": 888, "name": "LK16 03規格袋紐付 透明 100枚"}, {"code": 889, "name": "LK17 03規格袋紐付 透明 100枚"}]}, "10018": {"name": "井上ｶｰｻｰﾋﾞｽ", "products": [{"code": 685, "name": "(ｺｳ)広洋物産"}, {"code": 736, "name": "(ﾋﾗ)平井星光堂"}]}, "10019": {"name": "満  福", "products": [{"code": 1036, "name": "ｼﾝｶﾞｰﾆﾄﾘﾙSAT ﾌﾞﾙｰ M"}, {"code": 1037, "name": "ｼﾝｶﾞｰﾆﾄﾘﾙSAT ﾌﾞﾙｰ L"}, {"code": 1050, "name": "ﾍｲｺｰ耐油敷紙 4寸 500枚"}, {"code": 183, "name": "BOXﾃｨｯｼｭ ﾙﾐﾈﾌﾛｰﾘｰ200W×5P"}, {"code": 269, "name": "ｼﾝｶﾞｰﾎﾟﾘｽﾘﾑ 袋入 M ｸﾘｱ"}, {"code": 279, "name": "ｼﾝｶﾞｰﾎﾟﾘｽﾘﾑ 袋入 S ｸﾘｱ"}, {"code": 484, "name": "紙おしぼり ｸﾛｽｸﾘｰﾝ平 無地"}, {"code": 678, "name": "(ｴﾝ)ｴﾝｾﾞﾙ白衣"}, {"code": 687, "name": "(ﾐｿﾞ)溝端"}, {"code": 692, "name": "(ﾀﾅ)田中太商店"}, {"code": 732, "name": "(TKG)遠藤商事"}]}, "10020": {"name": "（有）はし萬商店", "products": [{"code": 40, "name": "【新】KV白ﾀｵﾙ160匁平付"}, {"code": 46, "name": "KV白ﾀｵﾙ200匁総ﾊﾟｲﾙ"}, {"code": 54, "name": "【新】KVｶﾗｰﾀｵﾙ160匁 ｺﾞｰﾙﾄﾞ"}, {"code": 64, "name": "OPP タオル用袋（KV）"}, {"code": 1030, "name": "ｶｴﾝ ﾆｭｰｴｰｽ E25 固形燃料【新】"}, {"code": 1031, "name": "ｶｴﾝ ﾆｭｰｴｰｽ E30 固形燃料【新】"}, {"code": 1033, "name": "Hｶﾐｿﾘ2枚刃CM袋入"}, {"code": 439, "name": "(ﾏｲﾝ)朝日化工"}, {"code": 695, "name": "(ｺﾏ)小間清"}, {"code": 712, "name": "(ｼｹﾞ)重光商事"}, {"code": 732, "name": "(TKG)遠藤商事"}, {"code": 784, "name": "2ﾂ折ｽﾘﾑﾌﾞﾗｼ SM"}]}, "10021": {"name": "小京都の湯　みくまﾎﾃﾙ", "products": [{"code": 40, "name": "【新】KV白ﾀｵﾙ160匁平付"}, {"code": 1019, "name": "ﾌﾚｯｼｭﾏｽﾀｰ ﾛｰﾙ 中"}, {"code": 1020, "name": "ﾌﾚｯｼｭﾏｽﾀｰ ﾛｰﾙ 大"}, {"code": 1030, "name": "ｶｴﾝ ﾆｭｰｴｰｽ E25 固形燃料【新】"}, {"code": 1031, "name": "ｶｴﾝ ﾆｭｰｴｰｽ E30 固形燃料【新】"}, {"code": 1032, "name": "おしぼり KT1500丸 乳白ﾌｨﾙﾑ無地"}, {"code": 1033, "name": "Hｶﾐｿﾘ2枚刃CM袋入"}, {"code": 1062, "name": "YZ-01 友禅千代紙2寸 200入"}, {"code": 146, "name": "【新】KA消毒済ｺｯﾌﾟ袋"}, {"code": 161, "name": "ｶｴﾝ ﾆｭｰｴｰｽ E15 固形燃料"}, {"code": 162, "name": "ｶｴﾝ ﾆｭｰｴｰｽ E20 固形燃料"}, {"code": 217, "name": "KA242 ｽﾃﾝﾚｽたわし60g"}, {"code": 269, "name": "ｼﾝｶﾞｰﾎﾟﾘｽﾘﾑ 袋入 M ｸﾘｱ"}, {"code": 279, "name": "ｼﾝｶﾞｰﾎﾟﾘｽﾘﾑ 袋入 S ｸﾘｱ"}, {"code": 288, "name": "ﾋﾞｰﾊﾞｰｺﾝｸｺﾝﾊﾟｸﾄ 750g×4袋"}, {"code": 294, "name": "ﾆｲﾀｶ ﾌﾞﾘｰﾁ2.5K 漂白剤"}, {"code": 295, "name": "ﾆｲﾀｶ ﾌﾞﾘｰﾁ 5.5k 漂白剤"}, {"code": 296, "name": "ﾆｲﾀｶ 泡ﾌﾞﾘｰﾁ5.5K 漂白剤"}, {"code": 299, "name": "ﾉﾛｽﾀｰ 5L ｱﾙｺｰﾙ製剤"}, {"code": 304, "name": "ﾆｭｰｹﾐｸｰﾙ 4K(E-1) 油汚れ落とし"}, {"code": 312, "name": "ﾉﾛｽﾀｰ 20L BIB"}, {"code": 338, "name": "花王ﾏｼﾞｯｸﾘﾝ除菌ﾌﾟﾗｽ 4.5L"}, {"code": 347, "name": "新】花王液体ﾋﾞｯｸ(ﾊﾞｲｵ酵素)"}, {"code": 380, "name": "ﾙｰｽﾀｰLK-3ｸﾛｽｸﾘｰﾅｰ台紙"}, {"code": 447, "name": "(CT)3寸角 耐油天紙(9×9)"}, {"code": 460, "name": "(CT)上質紙38cmﾏｯﾄ 柄"}, {"code": 464, "name": "(CT)尺3雲竜和紙ﾏｯﾄ 柄"}, {"code": 475, "name": "(ﾀﾞｲ)FM紙ｶｯﾌﾟ 5oz 無地"}, {"code": 496, "name": "Z1-2鮮度保持和紙 薄口15角"}, {"code": 498, "name": "便器巻紙　消毒済"}, {"code": 561, "name": "ﾌｼﾞｱﾙﾐｹｰｽ厚手 朝顔 小 500枚"}, {"code": 569, "name": "ﾋﾟﾁｯﾄ脱水ｼｰﾄ 32枚ﾛｰﾙ"}, {"code": 576, "name": "ﾀﾞｲｱﾗｯﾌﾟ 30cm×100m"}, {"code": 577, "name": "ﾀﾞｲｱﾗｯﾌﾟ 45cm×50m"}, {"code": 578, "name": "ﾀﾞｲｱﾗｯﾌﾟ 45cm×100m"}, {"code": 589, "name": "ｱﾙﾐﾎｲﾙE 30cm×50m"}, {"code": 590, "name": "ｱﾙﾐﾎｲﾙE 45cm×30m"}, {"code": 599, "name": "ｸｯｸﾊﾟｰｾﾊﾟﾚｰﾄ紙 丸型 M-14 500枚"}, {"code": 600, "name": "(CT)上質紙38cmﾏｯﾄ 無地"}, {"code": 608, "name": "ｸｯｷﾝｸﾞﾍﾟｰﾊﾟｰ ｿﾌﾄ 大"}, {"code": 609, "name": "ｸｯｷﾝｸﾞﾍﾟｰﾊﾟｰ ｿﾌﾄ 中"}, {"code": 621, "name": "3M ｽﾎﾟﾝｼﾞｴｰｽ L"}, {"code": 627, "name": "ｻﾝﾄﾞｸﾘｰﾝ 中目(大)"}, {"code": 653, "name": "子供ﾊﾌﾞﾗｼｾｯﾄ"}, {"code": 673, "name": "(ｻｶ)坂井硝子"}, {"code": 687, "name": "(ﾐｿﾞ)溝端"}, {"code": 690, "name": "(CT)ｾﾝﾄﾗﾙ"}, {"code": 695, "name": "(ｺﾏ)小間清"}, {"code": 696, "name": "(ﾀﾞｲ)大黒工業"}, {"code": 697, "name": "(ﾆｲ)ﾆｲﾀｶ"}, {"code": 699, "name": "(ﾏﾙ)丸信"}, {"code": 705, "name": "(ｱｻ)朝日化工"}, {"code": 710, "name": "(ｼｮｳ)尚美堂"}, {"code": 713, "name": "(ﾋﾗ)平野産業"}, {"code": 716, "name": "(ﾜｶ)若泉漆器"}, {"code": 722, "name": "(ﾜｿ)WASOO ﾜｿｰ"}, {"code": 723, "name": "(ｻﾝ)三和(ｷﾝﾁｬｸ)"}, {"code": 732, "name": "(TKG)遠藤商事"}, {"code": 784, "name": "2ﾂ折ｽﾘﾑﾌﾞﾗｼ SM"}, {"code": 795, "name": "ﾄｲﾚｯﾄﾍﾟｰﾊﾟ-街かどの花屋さん6RW"}, {"code": 797, "name": "24W ﾊﾌﾞﾗｼ SM 3g（白）"}, {"code": 883, "name": "LK11 03規格袋紐付 透明 100枚"}, {"code": 885, "name": "LK13 03規格袋紐付 透明 100枚"}, {"code": 887, "name": "LK15 03規格袋紐付 透明 100枚"}, {"code": 890, "name": "LK18 03規格袋紐付 透明 100枚"}, {"code": 892, "name": "LK20 03規格袋紐付 透明 100枚"}, {"code": 930, "name": "ｷｯﾁﾆｽﾀﾗｯﾌﾟ 22㎝×100m"}, {"code": 944, "name": "DSKｸﾘｰﾑｸﾚﾝｻﾞｰﾚﾓﾝ 400g"}, {"code": 956, "name": "ｴｽﾗｯﾌﾟAW WS-7-2638真空包装対応"}, {"code": 957, "name": "ｴｽﾗｯﾌﾟAW WS-7-3043真空包装対応"}, {"code": 963, "name": "TM43 業務用ﾎﾟﾘ袋 45L透明/0.025"}, {"code": 969, "name": "P-73 業務用ﾎﾟﾘ袋 70L 透明/0.04"}, {"code": 971, "name": "TM93 業務用ﾎﾟﾘ袋 90L 透明/0.04"}, {"code": 982, "name": "ｸｯｸﾊﾟｰEG 33×30m BOXﾀｲﾌﾟ"}]}, "10023": {"name": "桑野折箱店", "products": [{"code": 1030, "name": "ｶｴﾝ ﾆｭｰｴｰｽ E25 固形燃料【新】"}, {"code": 304, "name": "ﾆｭｰｹﾐｸｰﾙ 4K(E-1) 油汚れ落とし"}, {"code": 732, "name": "(TKG)遠藤商事"}]}, "10027": {"name": "亀山亭ホテル", "products": [{"code": 41, "name": "KV白ﾀｵﾙ180匁平付"}, {"code": 1022, "name": "阿蘇くじゅう連山の天然水 ｼｰﾙ付"}, {"code": 1051, "name": "ﾍｲｺｰ耐油敷紙 5寸 500枚"}, {"code": 160, "name": "ｶｴﾝ ﾆｭｰｴｰｽ E10 固形燃料"}, {"code": 161, "name": "ｶｴﾝ ﾆｭｰｴｰｽ E15 固形燃料"}, {"code": 162, "name": "ｶｴﾝ ﾆｭｰｴｰｽ E20 固形燃料"}, {"code": 183, "name": "BOXﾃｨｯｼｭ ﾙﾐﾈﾌﾛｰﾘｰ200W×5P"}, {"code": 188, "name": "ﾄｲﾚｯﾄﾍﾟｰﾊﾟｰ THE SMILE 1R130m"}, {"code": 198, "name": "ｴﾘｴｰﾙ ﾍﾟｰﾊﾟｰﾀｵﾙS 中判 200枚"}, {"code": 261, "name": "PR102室内小型ﾍﾟｰﾙ用中 半透明"}, {"code": 269, "name": "ｼﾝｶﾞｰﾎﾟﾘｽﾘﾑ 袋入 M ｸﾘｱ"}, {"code": 303, "name": "ｻﾆｸﾛｰﾙ12% 20kg BIB"}, {"code": 405, "name": "個包装綿棒白 SR-2W"}, {"code": 486, "name": "紙おしぼり Rﾌﾟﾗｽ丸LLﾊﾟｰﾙ ｿﾌｰﾙ"}, {"code": 576, "name": "ﾀﾞｲｱﾗｯﾌﾟ 30cm×100m"}, {"code": 578, "name": "ﾀﾞｲｱﾗｯﾌﾟ 45cm×100m"}, {"code": 589, "name": "ｱﾙﾐﾎｲﾙE 30cm×50m"}, {"code": 598, "name": "ｸｯｸﾊﾟｰｾﾊﾟﾚｰﾄ紙 丸型 M-18 500枚"}, {"code": 599, "name": "ｸｯｸﾊﾟｰｾﾊﾟﾚｰﾄ紙 丸型 M-14 500枚"}, {"code": 608, "name": "ｸｯｷﾝｸﾞﾍﾟｰﾊﾟｰ ｿﾌﾄ 大"}, {"code": 610, "name": "ｸｯｸﾊﾟｰｾﾊﾟﾚｰﾄ紙 丸型 M-11 500枚"}, {"code": 643, "name": "ﾗｲﾃｯｸ ﾁｬｯｶﾎﾞｰﾌﾞﾘｻ CR"}, {"code": 646, "name": "水野 ｸﾘｰﾝｷｬｯﾌﾟMﾀｲﾌﾟ白ﾑｼﾞ 50枚"}, {"code": 647, "name": "Hｶﾐｿﾘ2枚刃･ｼﾞｪﾙ ﾏｯﾄ袋入"}, {"code": 691, "name": "(ｾｲ)ｾｲｺｰ産業"}, {"code": 696, "name": "(ﾀﾞｲ)大黒工業"}, {"code": 705, "name": "(ｱｻ)朝日化工"}, {"code": 712, "name": "(ｼｹﾞ)重光商事"}, {"code": 722, "name": "(ﾜｿ)WASOO ﾜｿｰ"}, {"code": 782, "name": "ｼｬﾜｰｷｬｯﾌﾟ SM"}, {"code": 786, "name": "ｽﾄﾚｰﾄｽﾘﾑﾌﾞﾗｼ SM"}, {"code": 792, "name": "ﾚﾃﾞｨｰｽｾｯﾄ SM(ｺﾞﾑ/ｺｯﾄﾝ2/綿棒2)"}, {"code": 882, "name": "LK10 03規格袋紐付 透明 100枚"}, {"code": 894, "name": "28CL ﾊﾌﾞﾗｼ SM 4g (クリア)"}, {"code": 895, "name": "28B ﾊﾌﾞﾗｼ SM 4g (ブルー)"}, {"code": 896, "name": "28G ﾊﾌﾞﾗｼ SM 4g (グリーン)"}, {"code": 897, "name": "28PU ﾊﾌﾞﾗｼ SM 4g (パープル)"}, {"code": 898, "name": "28WR ﾊﾌﾞﾗｼ SM 4g (ﾜｲﾝﾚｯﾄﾞ)"}, {"code": 899, "name": "28SM ﾊﾌﾞﾗｼ SM 4g (スモーク)"}, {"code": 963, "name": "TM43 業務用ﾎﾟﾘ袋 45L透明/0.025"}, {"code": 969, "name": "P-73 業務用ﾎﾟﾘ袋 70L 透明/0.04"}, {"code": 982, "name": "ｸｯｸﾊﾟｰEG 33×30m BOXﾀｲﾌﾟ"}]}, "10028": {"name": "旅の宿　さつき", "products": [{"code": 27, "name": "KA白ｼｬｰﾘﾝｸﾞ260匁ﾌｪｲｽﾀｵﾙ"}, {"code": 1022, "name": "阿蘇くじゅう連山の天然水 ｼｰﾙ付"}, {"code": 1030, "name": "ｶｴﾝ ﾆｭｰｴｰｽ E25 固形燃料【新】"}, {"code": 1031, "name": "ｶｴﾝ ﾆｭｰｴｰｽ E30 固形燃料【新】"}, {"code": 1050, "name": "ﾍｲｺｰ耐油敷紙 4寸 500枚"}, {"code": 150, "name": "ｶﾐｿﾘ SM X3(ﾌﾞﾗｯｸ3枚刃ｽﾑｰｻｰ付)"}, {"code": 160, "name": "ｶｴﾝ ﾆｭｰｴｰｽ E10 固形燃料"}, {"code": 162, "name": "ｶｴﾝ ﾆｭｰｴｰｽ E20 固形燃料"}, {"code": 320, "name": "ﾘｷｯﾄﾞPH 18K扁平ﾊｲﾃﾅｰ"}, {"code": 460, "name": "(CT)上質紙38cmﾏｯﾄ 柄"}, {"code": 599, "name": "ｸｯｸﾊﾟｰｾﾊﾟﾚｰﾄ紙 丸型 M-14 500枚"}, {"code": 681, "name": "(ｱｻ)旭産業"}, {"code": 691, "name": "(ｾｲ)ｾｲｺｰ産業"}, {"code": 696, "name": "(ﾀﾞｲ)大黒工業"}, {"code": 785, "name": "2ﾂ折ｽｹﾙﾄﾝﾌﾞﾗｼ SM"}]}, "10037": {"name": "株式会社　元気の駅", "products": [{"code": 46, "name": "KV白ﾀｵﾙ200匁総ﾊﾟｲﾙ"}, {"code": 690, "name": "(CT)ｾﾝﾄﾗﾙ"}]}, "10039": {"name": "さくらﾃﾞｲｻｰﾋﾞｽ日田", "products": [{"code": 422, "name": "業務用洗濯洗剤 ｽｸﾘｯﾄ 5kg"}]}, "10043": {"name": "大分県済生会日田病院", "products": [{"code": 474, "name": "(ﾀﾞｲ)FM紙ｶｯﾌﾟ 3oz 無地"}, {"code": 576, "name": "ﾀﾞｲｱﾗｯﾌﾟ 30cm×100m"}, {"code": 677, "name": "(EBM)江部松商事"}, {"code": 696, "name": "(ﾀﾞｲ)大黒工業"}, {"code": 732, "name": "(TKG)遠藤商事"}, {"code": 788, "name": "不織布ｽﾘｯﾊﾟ 白"}, {"code": 962, "name": "TM42 業務用ﾎﾟﾘ袋 45L 黒/0.025"}, {"code": 963, "name": "TM43 業務用ﾎﾟﾘ袋 45L透明/0.025"}, {"code": 969, "name": "P-73 業務用ﾎﾟﾘ袋 70L 透明/0.04"}]}, "10044": {"name": "ﾎﾃﾙ　ｿｼｱ　(ﾚｽﾄﾗﾝ,　2F)", "products": [{"code": 1066, "name": "ﾏｲｺﾝﾛ専用ﾎﾞﾝﾍﾞ ﾏｲﾎﾞﾝﾍﾞ･L(K)"}, {"code": 151, "name": "▼ｱｲﾎﾞﾝﾍﾞPB-250-I"}, {"code": 162, "name": "ｶｴﾝ ﾆｭｰｴｰｽ E20 固形燃料"}, {"code": 301, "name": "ｾｰﾌｺｰﾙ58S 5L ｱﾙｺｰﾙ製剤"}, {"code": 460, "name": "(CT)上質紙38cmﾏｯﾄ 柄"}, {"code": 614, "name": "ﾌｼﾞｽｰﾊﾟｰｶｳﾝﾀｰｸﾛｽ 厚手 60枚"}, {"code": 643, "name": "ﾗｲﾃｯｸ ﾁｬｯｶﾎﾞｰﾌﾞﾘｻ CR"}, {"code": 699, "name": "(ﾏﾙ)丸信"}, {"code": 951, "name": "RE45ﾚｼﾞ袋省資源乳白 45号 100枚"}]}, "10045": {"name": "ＫＩＺＡＮ倶楽部", "products": [{"code": 1022, "name": "阿蘇くじゅう連山の天然水 ｼｰﾙ付"}, {"code": 1030, "name": "ｶｴﾝ ﾆｭｰｴｰｽ E25 固形燃料【新】"}, {"code": 1050, "name": "ﾍｲｺｰ耐油敷紙 4寸 500枚"}, {"code": 292, "name": "ﾘｷｯﾄﾞPLH 18K扁平ﾊｲﾃﾅｰ 洗浄機用"}, {"code": 406, "name": "ﾎﾞﾃﾞｨﾀｵﾙ BT-1788"}, {"code": 681, "name": "(ｱｻ)旭産業"}, {"code": 690, "name": "(CT)ｾﾝﾄﾗﾙ"}, {"code": 785, "name": "2ﾂ折ｽｹﾙﾄﾝﾌﾞﾗｼ SM"}]}, "10047": {"name": "すばる竹田園", "products": [{"code": 190, "name": "ﾄｲﾚｯﾄﾍﾟｰﾊﾟｰ ｲｯﾄｺSLIM1R100S"}]}, "10048": {"name": "メンテナンスサービス", "products": [{"code": 190, "name": "ﾄｲﾚｯﾄﾍﾟｰﾊﾟｰ ｲｯﾄｺSLIM1R100S"}, {"code": 303, "name": "ｻﾆｸﾛｰﾙ12% 20kg BIB"}, {"code": 674, "name": "(DN)ﾃﾞｨｰｴﾇｺｰﾎﾟ"}, {"code": 697, "name": "(ﾆｲ)ﾆｲﾀｶ"}, {"code": 921, "name": "ﾄｲﾚｯﾄﾍﾟｰﾊﾟｰ ｲﾂﾓﾖﾘ長持2倍100m/S"}]}, "10049": {"name": "ｸﾞﾘｰﾝ石油株式会社", "products": [{"code": 46, "name": "KV白ﾀｵﾙ200匁総ﾊﾟｲﾙ"}]}, "10051": {"name": "すばる竹田園(ｸﾞﾙｰﾌﾟﾎｰﾑ･小規模)", "products": [{"code": 190, "name": "ﾄｲﾚｯﾄﾍﾟｰﾊﾟｰ ｲｯﾄｺSLIM1R100S"}]}, "10055": {"name": "居酒家　万　座", "products": [{"code": 494, "name": "紙おしぼり RICH CLEAN 無地"}]}, "10057": {"name": "やなぎ屋", "products": [{"code": 1003, "name": "竹天削箸24cm"}, {"code": 198, "name": "ｴﾘｴｰﾙ ﾍﾟｰﾊﾟｰﾀｵﾙS 中判 200枚"}, {"code": 460, "name": "(CT)上質紙38cmﾏｯﾄ 柄"}, {"code": 494, "name": "紙おしぼり RICH CLEAN 無地"}, {"code": 705, "name": "(ｱｻ)朝日化工"}, {"code": 955, "name": "ｴｽﾗｯﾌﾟAW WS-7-2030真空包装対応"}]}, "10058": {"name": "Ｄａｎｋｅ", "products": [{"code": 355, "name": "花王 新ｷｯﾁﾝ泡ﾊｲﾀｰ 1L 付替用"}, {"code": 494, "name": "紙おしぼり RICH CLEAN 無地"}, {"code": 699, "name": "(ﾏﾙ)丸信"}]}, "10059": {"name": "株式会社　ＨＫ企画", "products": [{"code": 954, "name": "ｴｽﾗｯﾌﾟAW WS-7-1525真空包装対応"}, {"code": 955, "name": "ｴｽﾗｯﾌﾟAW WS-7-2030真空包装対応"}]}, "10062": {"name": "㈱ｼﾞｰ･ﾋﾟｰ･ｴｰ･ｺｰﾎﾟﾚｰｼｮﾝ(花の湯)", "products": [{"code": 21, "name": "KV160匁平付白ﾀｵﾙﾎﾟﾘ袋詰め"}, {"code": 40, "name": "【新】KV白ﾀｵﾙ160匁平付"}, {"code": 286, "name": "ｽｰﾊﾟｰｻﾗｾﾝ 4K(C-4)食器用洗剤"}, {"code": 405, "name": "個包装綿棒白 SR-2W"}, {"code": 697, "name": "(ﾆｲ)ﾆｲﾀｶ"}]}, "10064": {"name": "㈱ｼﾞｰ･ﾋﾟｰ･ｴｰ･ｺｰﾎﾟﾚｰｼｮﾝ　(勝福)", "products": [{"code": 286, "name": "ｽｰﾊﾟｰｻﾗｾﾝ 4K(C-4)食器用洗剤"}, {"code": 971, "name": "TM93 業務用ﾎﾟﾘ袋 90L 透明/0.04"}]}, "10066": {"name": "焼肉・しゃぶしゃぶ　将軍", "products": [{"code": 494, "name": "紙おしぼり RICH CLEAN 無地"}]}, "10067": {"name": "和食工房　新", "products": [{"code": 40, "name": "【新】KV白ﾀｵﾙ160匁平付"}, {"code": 576, "name": "ﾀﾞｲｱﾗｯﾌﾟ 30cm×100m"}, {"code": 609, "name": "ｸｯｷﾝｸﾞﾍﾟｰﾊﾟｰ ｿﾌﾄ 中"}, {"code": 696, "name": "(ﾀﾞｲ)大黒工業"}, {"code": 697, "name": "(ﾆｲ)ﾆｲﾀｶ"}, {"code": 705, "name": "(ｱｻ)朝日化工"}, {"code": 982, "name": "ｸｯｸﾊﾟｰEG 33×30m BOXﾀｲﾌﾟ"}]}, "10068": {"name": "(有)ﾄﾞﾗｲﾌﾞｲﾝ　古城", "products": [{"code": 1006, "name": "MO元禄箸･裸"}, {"code": 1028, "name": "6折ﾅﾌｷﾝ 白 山型"}, {"code": 1058, "name": "ﾍｲｺｰ天ぷら敷紙 500枚入"}, {"code": 521, "name": "妻楊枝 1kg ﾊﾞﾗ"}, {"code": 576, "name": "ﾀﾞｲｱﾗｯﾌﾟ 30cm×100m"}, {"code": 577, "name": "ﾀﾞｲｱﾗｯﾌﾟ 45cm×50m"}, {"code": 596, "name": "ﾀﾞｲｱﾗｯﾌﾟ 15cm×100m"}, {"code": 608, "name": "ｸｯｷﾝｸﾞﾍﾟｰﾊﾟｰ ｿﾌﾄ 大"}, {"code": 883, "name": "LK11 03規格袋紐付 透明 100枚"}, {"code": 921, "name": "ﾄｲﾚｯﾄﾍﾟｰﾊﾟｰ ｲﾂﾓﾖﾘ長持2倍100m/S"}, {"code": 967, "name": "P-48 業務用ﾎﾟﾘ袋 45L 透明/0.04"}]}, "10070": {"name": "森の石松", "products": [{"code": 1023, "name": "炭酸水 AQUA 500ml"}, {"code": 576, "name": "ﾀﾞｲｱﾗｯﾌﾟ 30cm×100m"}, {"code": 696, "name": "(ﾀﾞｲ)大黒工業"}]}, "10071": {"name": "㈲久大総合保険事務所", "products": [{"code": 714, "name": "(ﾀｶ)高鍋ﾀｵﾙ"}]}, "10072": {"name": "ステーキハウス ウシロー", "products": [{"code": 750, "name": "(ﾊﾗ)原厨"}, {"code": 954, "name": "ｴｽﾗｯﾌﾟAW WS-7-1525真空包装対応"}, {"code": 955, "name": "ｴｽﾗｯﾌﾟAW WS-7-2030真空包装対応"}, {"code": 956, "name": "ｴｽﾗｯﾌﾟAW WS-7-2638真空包装対応"}]}, "10074": {"name": "CROSS ROAD", "products": [{"code": 1036, "name": "ｼﾝｶﾞｰﾆﾄﾘﾙSAT ﾌﾞﾙｰ M"}, {"code": 1089, "name": "ﾌｼﾞﾊｲﾊﾟｰﾆﾄﾘﾙｸﾞﾛｰﾌﾞ粉ﾅｼ青 M"}, {"code": 589, "name": "ｱﾙﾐﾎｲﾙE 30cm×50m"}, {"code": 609, "name": "ｸｯｷﾝｸﾞﾍﾟｰﾊﾟｰ ｿﾌﾄ 中"}, {"code": 696, "name": "(ﾀﾞｲ)大黒工業"}, {"code": 697, "name": "(ﾆｲ)ﾆｲﾀｶ"}, {"code": 699, "name": "(ﾏﾙ)丸信"}, {"code": 982, "name": "ｸｯｸﾊﾟｰEG 33×30m BOXﾀｲﾌﾟ"}]}, "10075": {"name": "オーベルジュリヒト", "products": [{"code": 46, "name": "KV白ﾀｵﾙ200匁総ﾊﾟｲﾙ"}, {"code": 85, "name": "KA和風一層ﾋﾞﾆｰﾙ巾着 ﾋﾟﾝｸ"}, {"code": 1022, "name": "阿蘇くじゅう連山の天然水 ｼｰﾙ付"}, {"code": 146, "name": "【新】KA消毒済ｺｯﾌﾟ袋"}, {"code": 402, "name": "SA1ﾌｪｲｽﾏｽｸ"}, {"code": 406, "name": "ﾎﾞﾃﾞｨﾀｵﾙ BT-1788"}, {"code": 689, "name": "(ｻﾝ)山陽刷子"}, {"code": 698, "name": "(ﾊﾗ)原田実"}, {"code": 710, "name": "(ｼｮｳ)尚美堂"}, {"code": 792, "name": "ﾚﾃﾞｨｰｽｾｯﾄ SM(ｺﾞﾑ/ｺｯﾄﾝ2/綿棒2)"}, {"code": 898, "name": "28WR ﾊﾌﾞﾗｼ SM 4g (ﾜｲﾝﾚｯﾄﾞ)"}]}, "10076": {"name": "佐藤プロパン商会", "products": [{"code": 685, "name": "(ｺｳ)広洋物産"}]}, "10077": {"name": "ロペ", "products": [{"code": 712, "name": "(ｼｹﾞ)重光商事"}]}, "10078": {"name": "㈱エスエイチ日田", "products": [{"code": 673, "name": "(ｻｶ)坂井硝子"}, {"code": 712, "name": "(ｼｹﾞ)重光商事"}, {"code": 732, "name": "(TKG)遠藤商事"}]}, "10080": {"name": "鯛生ｽﾎﾟｰﾂｾﾝﾀｰ", "products": [{"code": 269, "name": "ｼﾝｶﾞｰﾎﾟﾘｽﾘﾑ 袋入 M ｸﾘｱ"}]}, "10081": {"name": "株式会社丸信　日田事業部", "products": [{"code": 40, "name": "【新】KV白ﾀｵﾙ160匁平付"}, {"code": 46, "name": "KV白ﾀｵﾙ200匁総ﾊﾟｲﾙ"}, {"code": 47, "name": "KV白ﾀｵﾙ220匁総ﾊﾟｲﾙ"}, {"code": 50, "name": "【新】KVｶﾗｰﾀｵﾙ160匁 ｲｴﾛｰ"}, {"code": 51, "name": "【新】KVｶﾗｰﾀｵﾙ160匁 ﾋﾟﾝｸ"}, {"code": 52, "name": "【新】KVｶﾗｰﾀｵﾙ160匁 ｸﾞﾘｰﾝ"}, {"code": 53, "name": "【新】KVｶﾗｰﾀｵﾙ160匁 ﾌﾞﾙｰ"}, {"code": 54, "name": "【新】KVｶﾗｰﾀｵﾙ160匁 ｺﾞｰﾙﾄﾞ"}, {"code": 64, "name": "OPP タオル用袋（KV）"}, {"code": 99, "name": "KVｶﾗｰﾀｵﾙ200匁総ﾊﾟｲﾙ ｲｴﾛｰ"}, {"code": 100, "name": "KVｶﾗｰﾀｵﾙ200匁総ﾊﾟｲﾙ ﾋﾟﾝｸ"}, {"code": 101, "name": "KVｶﾗｰﾀｵﾙ200匁総ﾊﾟｲﾙ ｸﾞﾘｰﾝ"}, {"code": 102, "name": "KVｶﾗｰﾀｵﾙ200匁総ﾊﾟｲﾙ ﾌﾞﾙｰ"}, {"code": 103, "name": "KVｶﾗｰﾀｵﾙ200匁総ﾊﾟｲﾙ ｺﾞｰﾙﾄﾞ"}, {"code": 677, "name": "(EBM)江部松商事"}, {"code": 695, "name": "(ｺﾏ)小間清"}, {"code": 732, "name": "(TKG)遠藤商事"}, {"code": 797, "name": "24W ﾊﾌﾞﾗｼ SM 3g（白）"}]}};
+
+const GAS_URL = "https://script.google.com/macros/s/AKfycbytKVPkLTdZwGzvc5cUZIEPKcV-r2z3YMiV33jYiFIMU-ivJUbOdasM6ZiYFvH32E0p/exec";
+const custSel = document.getElementById('sel-customer');
+
+Object.keys(CUSTOMER_DATA)
+  .sort((a,b)=>CUSTOMER_DATA[a].name.localeCompare(CUSTOMER_DATA[b].name,'ja'))
+  .forEach(k=>{
+    const o=document.createElement('option'); o.value=k; o.textContent=CUSTOMER_DATA[k].name; custSel.appendChild(o);
+  });
+
+const now=new Date();
+document.getElementById('hdate').innerHTML=
+  now.toLocaleDateString('ja-JP',{month:'numeric',day:'numeric',weekday:'short'})+'<br>'+
+  now.toLocaleTimeString('ja-JP',{hour:'2-digit',minute:'2-digit'});
+
+let selected={};
+let orderLog=[]; // {no,staff,cid,cname,items,memo,time,cancelled}
+let lastNo=0;
+
+function loadProducts(){
+  selected={};
+  const cid=custSel.value;
+  const list=document.getElementById('prod-list');
+  if(!cid){list.innerHTML='<div class="placeholder"><div class="ico">🏪</div><p>顧客を選ぶと<br>定番商品が表示されます</p></div>';checkReady();return;}
+  list.innerHTML='';
+  CUSTOMER_DATA[cid].products.forEach(p=>{
+    const d=document.createElement('div'); d.className='prod-item'; d.id='pi-'+p.code;
+    d.innerHTML=`<div class="chk" id="chk-${p.code}"></div><div class="prod-info"><div class="prod-name">${p.name}</div><div class="prod-code">#${p.code}</div></div><input class="qty" type="number" id="qty-${p.code}" min="1" value="1" onclick="event.stopPropagation()" oninput="syncQty(${p.code})">`;
+    d.onclick=()=>toggleProd(p.code); list.appendChild(d);
+  });
+  checkReady();
+}
+
+function toggleProd(code){
+  const item=document.getElementById('pi-'+code), chk=document.getElementById('chk-'+code);
+  if(selected[code]!==undefined){delete selected[code];item.classList.remove('selected');chk.textContent='';}
+  else{selected[code]=parseInt(document.getElementById('qty-'+code).value)||1;item.classList.add('selected');chk.textContent='✓';}
+  checkReady();
+}
+function syncQty(code){if(selected[code]!==undefined)selected[code]=parseInt(document.getElementById('qty-'+code).value)||1;}
+
+function checkReady(){
+  const n=Object.keys(selected).length;
+  document.getElementById('prod-count').textContent=n+'件選択';
+  const btn=document.getElementById('submit-btn');
+  const staff=document.getElementById('sel-staff').value, cust=custSel.value;
+  if(staff&&cust&&n>0){btn.className='submit-btn active';btn.textContent='確認・送信 ('+n+'件)';btn.disabled=false;}
+  else{btn.className='submit-btn';btn.textContent=!staff||!cust?'担当者と顧客を選択してください':'商品を1つ以上選択してください';btn.disabled=true;}
+}
+
+function showConfirm(){
+  const staff=document.getElementById('sel-staff').value, cid=custSel.value, cname=CUSTOMER_DATA[cid].name, memo=document.getElementById('memo').value;
+  document.getElementById('cf-meta').textContent=staff+' › '+cname;
+  let html='';
+  Object.keys(selected).forEach(code=>{
+    const p=CUSTOMER_DATA[cid].products.find(x=>x.code==code), qty=document.getElementById('qty-'+code).value;
+    html+=`<div class="cf-item"><span class="cf-name">${p.name}</span><span class="cf-qty">${qty} 個</span></div>`;
+  });
+  document.getElementById('cf-items').innerHTML=html;
+  document.getElementById('cf-memo').innerHTML=memo?`<div style="margin-top:10px;padding:10px;background:#f5f5f2;border-radius:8px;font-size:13px;color:#555">📝 ${memo}</div>`:'';
+  document.getElementById('overlay').classList.add('show');
+}
+function closeOverlay(){document.getElementById('overlay').classList.remove('show');}
+
+function submitOrder(){
+  closeOverlay();
+  const staff=document.getElementById('sel-staff').value, cid=custSel.value, cname=CUSTOMER_DATA[cid].name, memo=document.getElementById('memo').value;
+  const timeStr=new Date().toLocaleTimeString('ja-JP',{hour:'2-digit',minute:'2-digit'});
+  const items=Object.keys(selected).map(code=>{
+    const p=CUSTOMER_DATA[cid].products.find(x=>x.code==code);
+    return{code:p.code,name:p.name,qty:parseInt(document.getElementById('qty-'+code).value)||1};
+  });
+  lastNo++;
+  const no=lastNo;
+  const payload={staff,customerCode:cid,customer:cname,time:timeStr,memo,items,cancelled:false};
+
+  const sendBtn=document.getElementById('btn-send');
+  if(sendBtn){sendBtn.disabled=true;sendBtn.textContent='送信中...';}
+
+  fetch(GAS_URL,{method:'POST',mode:'no-cors',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)})
+  .finally(()=>{
+    orderLog.push({no,staff,cid,cname,items,memo,time:timeStr,cancelled:false,gasRow:null});
+    renderLog();
+    document.getElementById('s-msg').textContent=`${cname}\n${items.length}品目を記録しました（${no}件目）\n${timeStr}`;
+    document.getElementById('success').classList.add('show');
+    if(sendBtn){sendBtn.disabled=false;sendBtn.textContent='送信する ✓';}
+  });
+}
+
+function cancelOrder(no){
+  if(!confirm((no)+'件目の注文を取り消しますか？\nスプレッドシートに「取消」として記録されます。'))return;
+  const o=orderLog.find(x=>x.no===no);
+  if(!o)return;
+  o.cancelled=true;
+  // GASに取消通知
+  const payload={type:'cancel',staff:o.staff,customerCode:o.cid,customer:o.cname,time:o.time,memo:o.memo,items:o.items,cancelled:true};
+  fetch(GAS_URL,{method:'POST',mode:'no-cors',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)});
+  renderLog();
+}
+
+function renderLog(){
+  const logCard=document.getElementById('log-card'), logBody=document.getElementById('log-body');
+  const badge=document.getElementById('log-badge'), printBtn=document.getElementById('print-all-btn');
+  if(orderLog.length===0){logCard.style.display='none';return;}
+  logCard.style.display='block';
+  const activeCount=orderLog.filter(o=>!o.cancelled).length;
+  badge.textContent=orderLog.length+'件';
+  printBtn.disabled=activeCount===0;
+  logBody.innerHTML=orderLog.map(o=>`
+    <div class="log-row ${o.cancelled?'cancelled':''}">
+      <div class="log-num ${o.cancelled?'cancelled-num':''}">${o.no}</div>
+      <div class="log-body">
+        <div><span class="log-cname">${o.cname}</span><span class="log-time">${o.time}</span><span style="font-size:11px;color:#888;margin-left:4px">${o.staff}</span>${o.cancelled?'<span style="margin-left:8px;font-size:11px;color:#c0392b;font-weight:700">【取消済】</span>':''}</div>
+        <div class="log-items">${o.items.map(i=>i.name+'×'+i.qty).join('　')}</div>
+        ${o.memo?`<div style="font-size:11px;color:#888;margin-top:2px">📝 ${o.memo}</div>`:''}
+      </div>
+      ${o.cancelled
+        ? '<span class="cancelled-label">取消済</span>'
+        : `<button class="log-cancel-btn" onclick="cancelOrder(${o.no})">取消</button>`
+      }
+    </div>
+  `).join('');
+}
+
+function buildPrintHTML(orders){
+  const dateStr=new Date().toLocaleDateString('ja-JP',{year:'numeric',month:'long',day:'numeric',weekday:'long'});
+  const staff=orders.length>0?orders[0].staff:'';
+  const activeOrders=orders.filter(o=>!o.cancelled);
+  let blocks=orders.map(o=>{
+    const isCancelled=o.cancelled;
+    let rows=o.items.map(i=>`
+      <tr>
+        <td class="col-check">${isCancelled?'✕':'□'}</td>
+        <td class="col-code">#${i.code}</td>
+        <td class="col-name">${i.name}</td>
+        <td class="col-qty">${i.qty}</td>
+      </tr>`).join('');
+    return `
+      <div class="order-block ${isCancelled?'cancelled-block':''}">
+        <div class="ob-header">
+          <div>
+            <div class="ob-seq">受注 ${o.no}件目</div>
+            <div class="ob-cname">${o.cname}</div>
+            <div class="ob-code">顧客コード: ${o.cid}</div>
+          </div>
+          <div class="ob-meta">
+            ${isCancelled?'<span class="cancelled-stamp">取消済</span>':''}
+            <div>担当: ${o.staff}</div>
+            <div>${o.time}</div>
+          </div>
+        </div>
+        <table class="ob-table">
+          <thead><tr><th class="col-check">済</th><th class="col-code">商品CD</th><th class="col-name">商品名</th><th class="col-qty">数量</th></tr></thead>
+          <tbody>${rows}</tbody>
+        </table>
+        ${o.memo?`<div class="ob-memo">📝 メモ: ${o.memo}</div>`:''}
+      </div>`;
+  }).join('');
+
+  return `
+    <div class="print-page-header">
+      <h1>ピッキング指示書</h1>
+      <div class="ph-meta">${dateStr}　担当: ${staff}　有効: ${activeOrders.length}件（取消除く）</div>
+    </div>
+    ${blocks}
+    <div class="print-footer">印刷日時: ${new Date().toLocaleString('ja-JP')}</div>`;
+}
+
+function printLatest(){
+  document.getElementById('success').classList.remove('show');
+  const latest=orderLog[orderLog.length-1];
+  if(!latest)return;
+  document.getElementById('print-area').innerHTML=buildPrintHTML([latest]);
+  window.print();
+}
+
+function printAll(){
+  document.getElementById('success').classList.remove('show');
+  document.getElementById('print-area').innerHTML=buildPrintHTML(orderLog);
+  window.print();
+}
+
+function resetForm(){
+  document.getElementById('success').classList.remove('show');
+  selected={};
+  custSel.value='';
+  document.getElementById('memo').value='';
+  document.getElementById('prod-list').innerHTML='<div class="placeholder"><div class="ico">🏪</div><p>顧客を選ぶと<br>定番商品が表示されます</p></div>';
+  checkReady();
+}
+</script>
+</body>
+</html>
