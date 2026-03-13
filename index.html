@@ -267,10 +267,9 @@ function hlMatch(text, q){
   return text.slice(0,idx)+'<mark>'+text.slice(idx,idx+q.length)+'</mark>'+text.slice(idx+q.length);
 }
 
-// ソート済み顧客リスト
-const CUST_LIST = Object.keys(CUSTOMER_DATA)
-  .sort((a,b)=>CUSTOMER_DATA[a].name.localeCompare(CUSTOMER_DATA[b].name,'ja'))
-  .map(k=>({cid:k, name:CUSTOMER_DATA[k].name}));
+// 50音順顧客リスト（固定順）
+const CUST_ORDER = ["10018", "10072", "10059", "10017", "10064", "10045", "10027", "10071", "10003", "10049", "10074", "10023", "10037", "10068", "10043", "10039", "10028", "10076", "10012", "10066", "10067", "10047", "10008", "10051", "10044", "10001", "10080", "10006", "10058", "10020", "10078", "10062", "10002", "10016", "10081", "10055", "10019", "10021", "10048", "10070", "10057", "10005", "10075", "10077", "10013"];
+const CUST_LIST = CUST_ORDER.filter(k=>CUSTOMER_DATA[k]).map(k=>({cid:k, name:CUSTOMER_DATA[k].name}));
 
 function buildCustDropdown(q=''){
   const dd=document.getElementById('cust-dropdown');
