@@ -479,7 +479,7 @@ function submitOrder(){
   const sendBtn=document.getElementById('btn-send');
   if(sendBtn){sendBtn.disabled=true;sendBtn.textContent='送信中...';}
 
-  fetch(GAS_URL,{method:'POST',mode:'no-cors',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)})
+  fetch(GAS_URL,{method:'POST',mode:'no-cors',headers:{'Content-Type':'text/plain'},body:JSON.stringify(payload)})
   .finally(()=>{
     orderLog.push({no,staff,cid,cname,items,memo,time:timeStr,cancelled:false,gasRow:null});
     renderLog();
@@ -497,7 +497,7 @@ function cancelOrder(no){
   renderLog();
   // GASに取消通知（行番号があれば行番号で、なければ時刻で検索）
   const payload={type:'cancel',gasRow:o.gasRow||null,staff:o.staff,customerCode:o.cid,customer:o.cname,time:o.time};
-  fetch(GAS_URL,{method:'POST',mode:'no-cors',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)});
+  fetch(GAS_URL,{method:'POST',mode:'no-cors',headers:{'Content-Type':'text/plain'},body:JSON.stringify(payload)});
 }
 
 function renderLog(){
